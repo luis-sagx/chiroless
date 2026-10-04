@@ -3,8 +3,9 @@
 Objetivo: registro de ingresos/gastos fácil (texto libre, voz, foto, atajos), gráficas claras, estilo con más vida.
 Fuente de verdad: `PLAN_REGISTRO_INTELIGENTE.md` (fases 0–9). Rama: `feat/registro-inteligente`.
 TDD: off salvo Fase 3 (plan lo exige). Runner: `flutter test`. Checks por fase: `flutter analyze` (0 err/0 warn), `flutter test`, desde Fase 2 `flutter build apk --debug`.
-Autorizado: Fase 0 y Fase 1 (D1: no está en Play Store, solo local; a futuro sí). Fase 2+ requiere ir confirmando.
+Autorizado: Fases 0–9 por el pedido actual de continuar las fases restantes inline en esta rama. D1: no está en Play Store, solo local; a futuro sí. La configuración de Firebase Console y la prueba en dispositivo dependen del usuario.
 Delivery: ask-on-risk. Push/PR/merge: decisión del usuario. Commits sin coautor (pedido del usuario).
+Ruta: inline por instrucción explícita del usuario, aunque varias fases abarcan múltiples archivos. Pronóstico: unas 1800–2400 líneas modificadas, excluidos archivos generados. Mirror Engram pendiente: sus herramientas no están disponibles en este entorno.
 
 ## Tareas
 - [x] 0 Fase 0 — commit 7aac48e
