@@ -8,7 +8,7 @@ import '../../../../models/user_model.dart';
 import '../../../../shared/widgets/custom_text_field.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../profile/presentation/pages/terms_conditions_page.dart';
-import '../../../survey/presentation/pages/survey_page.dart';
+import '../../../home/presentation/pages/home_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({Key? key}) : super(key: key);
@@ -88,12 +88,10 @@ class _RegisterPageState extends State<RegisterPage> {
         await userService.createUser(appUser);
 
         if (mounted) {
-          // Redirigir a la encuesta PRE
-          Navigator.pushReplacement(
+          Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(
-              builder: (_) => const SurveyPage(surveyType: 'PRE'),
-            ),
+            MaterialPageRoute(builder: (_) => const HomePage()),
+            (route) => false,
           );
         }
       }

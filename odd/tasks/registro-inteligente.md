@@ -8,7 +8,7 @@ Delivery: ask-on-risk; 2350 líneas acumuladas aprox. (sin lock, registrantes ge
 Ruta: inline por instrucción explícita del usuario, aunque varias fases abarcan múltiples archivos. Pronóstico: unas 1800–2400 líneas modificadas, excluidos archivos generados. Mirror Engram pendiente: sus herramientas no están disponibles en este entorno.
 
 ## Tareas
-- [ ] 10 Claridad del registro rápido: texto y voz con acciones explícitas, ocultar entrada de foto/cámara, selección de categoría sin visto. Ruta inline por instrucción del usuario; afecta el widget existente. Comprobar con analyze, test y APK debug; revisión visual Android pendiente del usuario.
+- [x] 10 Claridad del registro rápido: texto y voz con acciones explícitas, ocultar entrada de foto/cámara, selección de categoría sin visto. Ruta inline por instrucción del usuario; commit `3742ecb`. `flutter analyze --no-pub --no-fatal-infos`: 0 errores/0 warnings, 80 infos; `flutter test --no-pub`: 12/12; APK debug compilado; detector de UI: `[]`. Revisión visual Android pendiente del usuario.
 - [ ] 11 Retirar encuestas inicial y final del flujo: registro directo a Inicio, sin acceso a encuesta final; eliminar código de encuesta sin otros consumidores. Ruta inline por instrucción del usuario; afecta registro, inicio y módulo de encuestas. Comprobar referencias, analyze, test y APK debug.
 - [x] 0 Fase 0 — commit 7aac48e
 - [x] 1 Fase 1 — commit eb3de6a (ruta: inline por pedido del usuario; analyze 0 err/0 warn, test ok)

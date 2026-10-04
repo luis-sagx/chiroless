@@ -17,8 +17,6 @@ import '../../../profile/presentation/pages/edit_profile_page.dart';
 import '../../../profile/presentation/pages/help_page.dart';
 import '../../../profile/presentation/pages/about_page.dart';
 import '../../../profile/presentation/pages/terms_conditions_page.dart';
-import '../../../survey/presentation/pages/survey_page.dart';
-import '../../../survey/data/survey_service.dart';
 import '../../../ai_assistant/presentation/pages/ai_assistant_page.dart';
 import '../../../transactions/data/transaction_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
@@ -39,7 +37,6 @@ class _HomePageState extends State<HomePage> {
   final service = FirebaseService();
   final userService = UserService();
   final transactionService = TransactionService();
-  final surveyService = SurveyService();
   int _selectedIndex = 0;
   AppUser? appUser;
   bool isLoadingUser = true;
@@ -205,20 +202,6 @@ class _HomePageState extends State<HomePage> {
     if (result == true) {
       _loadUser(); // Reload to update user data
     }
-  }
-
-  // Verificar si se puede mostrar la encuesta POST
-  Future<bool> _canShowPostSurvey() async {
-    if (appUser == null) return false;
-
-    // Verificar si ya completó la encuesta POST
-    final hasCompletedPost = await surveyService.hasCompletedPostSurvey(
-      appUser!.uid,
-    );
-    if (hasCompletedPost) return false;
-
-    // Verificar si han pasado 15+ días
-    return surveyService.canCompletePostSurvey(appUser!.createdAt);
   }
 
   void _showAddTransactionOptions({bool isExpense = true}) async {
@@ -711,29 +694,6 @@ class _HomePageState extends State<HomePage> {
                     builder: (context) => const TermsConditionsPage(),
                   ),
                 );
-              },
-            ),
-
-            // Encuesta POST (solo si han pasado 15+ días)
-            FutureBuilder<bool>(
-              future: _canShowPostSurvey(),
-              builder: (context, snapshot) {
-                if (snapshot.data == true) {
-                  return _buildMenuItem(
-                    Icons.assignment_outlined,
-                    'Encuesta Final',
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const SurveyPage(surveyType: 'POST'),
-                        ),
-                      );
-                    },
-                  );
-                }
-                return const SizedBox.shrink();
               },
             ),
 
