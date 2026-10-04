@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../../core/services/firebase_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -86,15 +88,12 @@ class _AddIncomePageState extends State<AddIncomePage> {
       );
 
       await _transactionService.createIncome(income);
-
-      // Award points for registering income
-      await _gamificationService.awardPointsForTransaction(
-        user.uid,
-        isExpense: false,
+      unawaited(
+        _gamificationService.onTransactionRegistered(
+          user.uid,
+          isExpense: false,
+        ),
       );
-
-      // Check and unlock achievements
-      await _gamificationService.checkAndUnlockAchievements(user.uid);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

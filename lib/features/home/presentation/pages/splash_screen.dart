@@ -21,7 +21,7 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 700),
       vsync: this,
     );
 
@@ -39,15 +39,13 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    _controller.forward();
-
-    // Navigate after delay
-    Future.delayed(const Duration(seconds: 3), () {
-      _checkAuthAndNavigate();
+    _controller.forward().whenComplete(() {
+      if (mounted) _checkAuthAndNavigate();
     });
   }
 
   Future<void> _checkAuthAndNavigate() async {
+    if (!mounted) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       Navigator.of(

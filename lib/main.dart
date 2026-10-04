@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -9,19 +11,27 @@ import 'features/home/presentation/pages/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Cargar variables de entorno (opcional)
   await EnvConfig.load();
-
-  // Inicializar Firebase con opciones de plataforma
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // Inicializar Notificaciones
-  await NotificationService().init();
-
-  // Programar recordatorios diarios a las 1 PM y 8 PM (hora Ecuador)
-  await NotificationService().scheduleDailyReminder();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on FirebaseException catch (e) {
+    if (e.code != 'duplicate-app') rethrow;
+  }
 
   runApp(const MyApp());
+
+  unawaited(_initNotifications());
+}
+
+Future<void> _initNotifications() async {
+  try {
+    await NotificationService().init();
+    await NotificationService().scheduleDailyReminder();
+  } catch (e) {
+    print('Error inicializando notificaciones: $e');
+  }
 }
 
 class MyApp extends StatelessWidget {

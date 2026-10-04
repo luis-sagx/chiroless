@@ -39,8 +39,8 @@ class AppConstants {
   static const double criticalBudgetPercentage = 95.0; // Crítico al 95%
 
   // Puntos de experiencia para gamificación
-  static const int pointsPerExpenseRegistered = 5;
-  static const int pointsPerIncomeRegistered = 5;
+  static const int pointsPerExpenseRegistered = 10;
+  static const int pointsPerIncomeRegistered = 15;
   static const int pointsPerBudgetCompliance = 50;
   static const int pointsPerAchievementUnlocked = 100;
 }

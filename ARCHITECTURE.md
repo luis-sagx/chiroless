@@ -133,6 +133,21 @@ Configuraciones y servicios globales:
 - **Constants**: Categorías, niveles, etc.
 - **Services**: Firebase, Auth
 
+## 🚀 Arranque y UX
+
+- `main.dart` solo espera `EnvConfig.load()` y `Firebase.initializeApp()` antes de `runApp`.
+- Las notificaciones se inicializan en background con `_initNotifications()`, para no bloquear el primer frame.
+- `SplashScreen` anima el logo por `700 ms` y navega al terminar la animación, sin delay fijo.
+- El botón central `+` del home abre `QuickAddSheet`, que registra gastos/ingresos con `unawaited(...)` para aprovechar la persistencia offline de Firestore y cerrar la UI al instante.
+
+## 🏆 Gamificación
+
+- El punto de entrada único post-transacción es `GamificationService.onTransactionRegistered(...)`.
+- El flujo de recompensas corre en este orden: sumar puntos por acción, actualizar racha persistente en `users/{uid}`, evaluar logros.
+- Los puntos del usuario se actualizan con transacciones de Firestore para evitar carreras.
+- Los logros usan IDs determinísticos (`{uid}_{key}`) y se crean con `unlockedAt` desde el inicio para que el desbloqueo sea idempotente.
+- La pantalla de logros mezcla documentos desbloqueados de Firestore con templates locales para mostrar también los pendientes.
+
 ## 🔄 Flujo de Datos
 
 ```
@@ -142,11 +157,12 @@ UI (Page) → Service → Firebase → Model → UI
 Ejemplo:
 
 ```dart
-// 1. Usuario registra un gasto
-AddExpensePage() → expenseService.createExpense()
-                 → Firebase Firestore
-                 → Expense Model
-                 → UI actualizada
+// Registro rápido desde el home
+QuickAddSheet() → transactionService.createExpense()/createIncome()
+                → Firestore local/offline cache
+                → Navigator.pop() inmediato
+                → HomePage aplica balance optimista
+                → GamificationService.onTransactionRegistered() en background
 ```
 
 ## 📦 Dependencias entre Features

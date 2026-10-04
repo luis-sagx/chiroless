@@ -20,6 +20,8 @@ import '../../../ai_assistant/presentation/pages/ai_assistant_page.dart';
 import '../../../transactions/data/transaction_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../../../models/expense_model.dart';
+import '../../../../models/income_model.dart';
+import '../../../transactions/presentation/widgets/quick_add_sheet.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -54,6 +56,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadUser() async {
     final user = service.currentUser;
     if (user != null) {
+      final transactionsFuture = _loadTransactionData();
       final userData = await userService.getUser(user.uid);
       if (mounted) {
         setState(() {
@@ -61,8 +64,7 @@ class _HomePageState extends State<HomePage> {
           isLoadingUser = false;
         });
       }
-      // Load transaction data
-      await _loadTransactionData();
+      await transactionsFuture;
     }
   }
 
@@ -75,20 +77,25 @@ class _HomePageState extends State<HomePage> {
     }
 
     try {
-      final summary = await transactionService.getMonthSummary(user.uid);
-      final expenses = await transactionService.getUserExpenses(user.uid);
-      final incomes = await transactionService.getUserIncomes(user.uid);
-
-      // Combine and sort by date
+      final results = await Future.wait([
+        transactionService.getUserExpenses(user.uid),
+        transactionService.getUserIncomes(user.uid),
+      ]);
+      final expenses = results[0] as List<Expense>;
+      final incomes = results[1] as List<Income>;
+      final totalExpenses =
+          expenses.fold<double>(0, (sum, expense) => sum + expense.amount);
+      final totalIncomes =
+          incomes.fold<double>(0, (sum, income) => sum + income.amount);
       final List<dynamic> combined = [...expenses, ...incomes];
       combined.sort((a, b) => b.date.compareTo(a.date));
 
       if (mounted) {
         setState(() {
-          totalBalance = summary['balance'] ?? 0.0;
-          totalIncome = summary['totalIncomes'] ?? 0.0;
-          totalExpense = summary['totalExpenses'] ?? 0.0;
-          recentTransactions = combined.take(5).toList(); // Only 5 most recent
+          totalBalance = totalIncomes - totalExpenses;
+          totalIncome = totalIncomes;
+          totalExpense = totalExpenses;
+          recentTransactions = combined.take(5).toList();
           isLoadingTransactions = false;
         });
       }
@@ -180,111 +187,40 @@ class _HomePageState extends State<HomePage> {
     return surveyService.canCompletePostSurvey(appUser!.createdAt);
   }
 
-  void _showAddTransactionOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Agregar Transacción',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                      _navigateToAddIncome();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppTheme.secondaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.secondaryColor),
-                      ),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.add_circle_outline,
-                            color: AppTheme.secondaryColor,
-                            size: 48,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Ingreso',
-                            style: TextStyle(
-                              color: AppTheme.secondaryColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                      _navigateToAddExpense();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.accentColor),
-                      ),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.remove_circle_outline,
-                            color: AppTheme.accentColor,
-                            size: 48,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Gasto',
-                            style: TextStyle(
-                              color: AppTheme.accentColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+  void _showAddTransactionOptions() async {
+    final result = await showModalBottomSheet<QuickAddResult>(
+      context: this.context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      builder: (context) => const QuickAddSheet(),
     );
+    if (result != null && mounted) {
+      _applyOptimisticTransaction(result);
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.isExpense ? 'Gasto guardado' : 'Ingreso guardado',
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _applyOptimisticTransaction(QuickAddResult result) {
+    setState(() {
+      if (result.isExpense) {
+        totalExpense += result.amount;
+        totalBalance -= result.amount;
+      } else {
+        totalIncome += result.amount;
+        totalBalance += result.amount;
+      }
+    });
   }
 
   @override
@@ -328,7 +264,7 @@ class _HomePageState extends State<HomePage> {
           onTap: (index) {
             if (index == 2) {
               // Botón central - mostrar opciones
-              _showAddTransactionOptions(context);
+              _showAddTransactionOptions();
             } else {
               setState(() {
                 _selectedIndex = index;

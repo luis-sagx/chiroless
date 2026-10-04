@@ -84,6 +84,7 @@ class AchievementTemplates {
   static const List<Map<String, dynamic>> templates = [
     {
       'title': 'Primera transacción',
+      'key': 'first_transaction',
       'description': 'Registraste tu primer gasto o ingreso',
       'icon': 'star',
       'points': 10,
@@ -91,6 +92,7 @@ class AchievementTemplates {
     },
     {
       'title': 'Racha de 7 días',
+      'key': 'streak_7',
       'description': 'Registraste transacciones durante 7 días consecutivos',
       'icon': 'local_fire_department',
       'points': 50,
@@ -98,21 +100,26 @@ class AchievementTemplates {
     },
     {
       'title': 'Presupuesto cumplido',
-      'description': 'Completaste un mes sin exceder tu presupuesto',
+      'key': 'budget_month',
+      'description': 'Cerraste un mes sin exceder tu presupuesto',
       'icon': 'check_circle',
       'points': 100,
       'category': 'budget',
     },
     {
       'title': 'Ahorrador novato',
-      'description': 'Ahorraste al menos 10% de tus ingresos',
+      'key': 'savings_10',
+      'description':
+          'Ahorraste al menos 10% de tus ingresos del mes (mín. 5 gastos)',
       'icon': 'savings',
       'points': 75,
       'category': 'savings',
     },
     {
       'title': 'Control total',
-      'description': 'Mantuviste gastos impulsivos bajo 20%',
+      'key': 'control_impulse',
+      'description':
+          'Con 10+ gastos registrados, mantuviste los impulsivos bajo 20%',
       'icon': 'psychology',
       'points': 150,
       'category': 'milestone',
