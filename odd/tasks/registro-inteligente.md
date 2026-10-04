@@ -12,7 +12,7 @@ Ruta: inline por instrucción explícita del usuario, aunque varias fases abarca
 - [x] 1 Fase 1 — commit eb3de6a (ruta: inline por pedido del usuario; analyze 0 err/0 warn, test ok)
 - [ ] 2 Fase 2 — código y APK debug verificados en commit 2bd86b5; pendiente Firebase Console y prueba de chat en dispositivo. `flutter test` pasó, análisis: 0 errores/0 warnings y 140 infos; APK debug compiló. Desviación: Kotlin 2.3.0 y `compilerOptions` por incompatibilidad de Gradle. Ruta inline por pedido del usuario.
 - [x] 3 Fase 3 — parser local (TDD). RED: faltaba `local_transaction_parser.dart`; GREEN: `flutter test --no-pub` 12/12. Análisis: 0 errores/0 warnings, 140 infos. Ruta inline por pedido del usuario; commit registrado abajo.
-- [ ] 4 Fase 4 — extracción IA texto/foto
+- [x] 4 Fase 4 — servicio de extracción IA texto/foto; `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (141 infos), `flutter test --no-pub` 12/12, APK debug compilado. Prueba real de IA pendiente de Firebase Console y UI (fase 5). Ruta inline por pedido del usuario; commit registrado abajo.
 - [ ] 5 Fase 5 — QuickAddSheet inteligente
 - [ ] 6 Fase 6 — App shortcuts
 - [ ] 7 Fase 7 — gráficas
