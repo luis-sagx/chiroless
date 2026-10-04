@@ -14,7 +14,13 @@ Ruta: inline por instrucción explícita del usuario, aunque varias fases abarca
 - [x] 3 Fase 3 — parser local (TDD). RED: faltaba `local_transaction_parser.dart`; GREEN: `flutter test --no-pub` 12/12. Análisis: 0 errores/0 warnings, 140 infos. Ruta inline por pedido del usuario; commit registrado abajo.
 - [x] 4 Fase 4 — servicio de extracción IA texto/foto; `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (141 infos), `flutter test --no-pub` 12/12, APK debug compilado. Prueba real de IA pendiente de Firebase Console y UI (fase 5). Ruta inline por pedido del usuario; commit registrado abajo.
 - [ ] 5 Fase 5 — código integrado (texto, voz, foto, home y refresco de estadísticas); `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (135 infos), `flutter test --no-pub` 12/12 y APK debug compilado. Pendiente prueba manual Android (no hay dispositivo conectado) y Firebase Console. El cambio supera la heurística de 400 líneas porque reemplaza el sheet completo según el plan. El guardado ahora espera a Firestore para evitar falsos éxitos y refrescos prematuros. Ruta inline por pedido del usuario; commit registrado abajo.
-- [ ] 6 Fase 6 — App shortcuts
+- [ ] 6 Fase 6 — accesos directos implementados; `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (136 infos), `flutter test --no-pub` 12/12, APK debug compilado. Pruebas de pulsación y arranque desde Android pendientes: no hay dispositivo conectado. Ruta inline por pedido del usuario; commit registrado abajo.
 - [ ] 7 Fase 7 — gráficas
 - [ ] 8 Fase 8 — estilo
 - [ ] 9 Fase 9 — verificación final + docs
+
+## Evidencia de commits de esta continuación
+- Fase 2: `2bd86b5`.
+- Fase 3: `e23ba1e`.
+- Fase 4: `5739a08`.
+- Fase 5: `7a4f8b4`.

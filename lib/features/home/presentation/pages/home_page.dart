@@ -1,4 +1,5 @@
 import '../../../../core/constants/transaction_categories.dart';
+import '../../../../core/services/shortcut_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../admin/presentation/pages/admin_page.dart';
@@ -54,12 +55,22 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     initializeDateFormatting('es', null);
     _loadUser();
+    ShortcutService.pending.addListener(_handleShortcut);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleShortcut());
   }
 
   @override
   void dispose() {
+    ShortcutService.pending.removeListener(_handleShortcut);
     _dataVersion.dispose();
     super.dispose();
+  }
+
+  void _handleShortcut() {
+    final type = ShortcutService.pending.value;
+    if (type == null || !mounted) return;
+    ShortcutService.pending.value = null;
+    _showAddTransactionOptions(isExpense: type != ShortcutService.addIncome);
   }
 
   Future<void> _loadUser() async {

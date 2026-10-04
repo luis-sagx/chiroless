@@ -8,6 +8,7 @@ import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/config/env_config.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/shortcut_service.dart';
 import 'features/home/presentation/pages/splash_screen.dart';
 
 void main() async {
@@ -32,6 +33,7 @@ void main() async {
   runApp(const MyApp());
 
   unawaited(_initNotifications());
+  unawaited(_initShortcuts());
 }
 
 Future<void> _initNotifications() async {
@@ -40,6 +42,14 @@ Future<void> _initNotifications() async {
     await NotificationService().scheduleDailyReminder();
   } catch (e) {
     print('Error inicializando notificaciones: $e');
+  }
+}
+
+Future<void> _initShortcuts() async {
+  try {
+    await ShortcutService.init();
+  } catch (e) {
+    print('Error inicializando accesos directos: $e');
   }
 }
 
