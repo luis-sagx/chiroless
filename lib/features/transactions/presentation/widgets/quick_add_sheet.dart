@@ -280,23 +280,17 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'Describe tu gasto o ingreso',
+          'Escribe o dicta un movimiento',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'Escribe o dicta una frase. Detectaremos el monto, el tipo y la categoría.',
-          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         TextField(
           controller: _smartController,
           textInputAction: TextInputAction.done,
           onSubmitted: _interpretText,
-          minLines: 1,
-          maxLines: 2,
+          maxLines: 1,
           decoration: const InputDecoration(
-            hintText: 'Ej.: Pagué 12,50 por almuerzo ayer',
+            hintText: 'Ej.: Almuerzo 12,50 ayer',
             fillColor: AppTheme.backgroundColor,
           ),
         ),
@@ -376,6 +370,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
                   spacing: 12,
                   children: [
                     ChoiceChip(
+                      showCheckmark: false,
                       label: const Text('Gasto'),
                       selected: _isExpense,
                       selectedColor: AppTheme.expenseColor.withValues(
@@ -390,6 +385,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
                       onSelected: (_) => _setMode(true),
                     ),
                     ChoiceChip(
+                      showCheckmark: false,
                       label: const Text('Ingreso'),
                       selected: !_isExpense,
                       selectedColor: AppTheme.incomeColor.withValues(
@@ -458,33 +454,32 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _options.map((option) {
-                    final selected = option == _selectedCategory;
+                DropdownButtonFormField<String>(
+                  key: ValueKey('$_isExpense-$_selectedCategory'),
+                  initialValue: _selectedCategory,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Categoría',
+                    fillColor: AppTheme.backgroundColor,
+                  ),
+                  items: _options.map((option) {
                     final info = _infoOf(option);
-                    return ChoiceChip(
-                      showCheckmark: false,
-                      avatar: Icon(
-                        info.icon,
-                        size: 18,
-                        color: selected ? info.color : AppTheme.textSecondary,
+                    return DropdownMenuItem<String>(
+                      value: option,
+                      child: Row(
+                        children: [
+                          Icon(info.icon, size: 18, color: info.color),
+                          const SizedBox(width: 10),
+                          Text(option),
+                        ],
                       ),
-                      label: Text(option),
-                      selected: selected,
-                      selectedColor: info.color.withValues(alpha: 0.14),
-                      labelStyle: TextStyle(
-                        color: selected ? info.color : Colors.grey.shade700,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                      onSelected: (_) {
-                        setState(() => _selectedCategory = option);
-                      },
                     );
                   }).toList(),
+                  onChanged: (option) {
+                    if (option != null) {
+                      setState(() => _selectedCategory = option);
+                    }
+                  },
                 ),
                 const SizedBox(height: 20),
                 SizedBox(
