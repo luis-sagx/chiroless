@@ -42,7 +42,7 @@ class QuickAddWidget : AppWidgetProvider() {
                 views.setViewVisibility(R.id.widget_progress_row, View.GONE)
             } else {
                 views.setTextViewText(R.id.widget_title, "${prefs.getString("month", "")} · gastado")
-                views.setTextViewTextSize(R.id.widget_amount, TypedValue.COMPLEX_UNIT_SP, 26f)
+                views.setTextViewTextSize(R.id.widget_amount, TypedValue.COMPLEX_UNIT_SP, 32f)
                 if (prefs.getBoolean("hidden", false)) {
                     views.setTextViewText(R.id.widget_amount, "••••")
                     views.setViewVisibility(R.id.widget_progress_row, View.GONE)
