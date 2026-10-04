@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_exceptions.dart';
+import 'home_widget_service.dart';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -38,6 +39,7 @@ class FirebaseService {
   Future<void> logout() async {
     try {
       await _auth.signOut();
+      await HomeWidgetService.clear(); // no lanza
     } catch (e) {
       throw AuthException('Error al cerrar sesión', 'logout-error');
     }

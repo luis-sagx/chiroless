@@ -1,6 +1,10 @@
 import '../../../../core/constants/transaction_categories.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../core/services/shortcut_service.dart';
+import '../../../../core/services/home_widget_service.dart';
+import '../../../budget/data/budget_service.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../admin/presentation/pages/admin_page.dart';
@@ -37,6 +41,8 @@ class _HomePageState extends State<HomePage> {
   final service = FirebaseService();
   final userService = UserService();
   final transactionService = TransactionService();
+  final _budgetService = BudgetService();
+  bool _widgetHidden = false;
   int _selectedIndex = 0;
   AppUser? appUser;
   bool isLoadingUser = true;
@@ -55,6 +61,9 @@ class _HomePageState extends State<HomePage> {
     _loadUser();
     ShortcutService.pending.addListener(_handleShortcut);
     WidgetsBinding.instance.addPostFrameCallback((_) => _handleShortcut());
+    HomeWidgetService.isHidden().then((v) {
+      if (mounted) setState(() => _widgetHidden = v);
+    });
   }
 
   @override
@@ -127,6 +136,7 @@ class _HomePageState extends State<HomePage> {
           _topExpenseCategories = topCategories;
           isLoadingTransactions = false;
         });
+        unawaited(_syncWidget());
       }
     } catch (e) {
       print('Error loading transactions: $e');
@@ -244,6 +254,18 @@ class _HomePageState extends State<HomePage> {
         totalBalance += result.amount;
       }
     });
+    if (result.isExpense) unawaited(_syncWidget());
+  }
+
+  // Actualiza el widget de pantalla de inicio con el gasto del mes.
+  Future<void> _syncWidget() async {
+    final user = service.currentUser;
+    if (user == null) return;
+    final budget = await _budgetService.getCurrentBudget(user.uid);
+    await HomeWidgetService.update(
+      spent: totalExpense,
+      limit: budget?.monthlyLimit,
+    );
   }
 
   @override
@@ -696,6 +718,17 @@ class _HomePageState extends State<HomePage> {
                 );
               },
             ),
+            if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+              _buildMenuItem(
+                Icons.visibility_off_outlined,
+                'Ocultar montos en widget',
+                () => _setWidgetHidden(!_widgetHidden),
+                trailing: Switch(
+                  value: _widgetHidden,
+                  onChanged: _setWidgetHidden,
+                  activeThumbColor: AppTheme.primaryColor,
+                ),
+              ),
 
             const SizedBox(height: 16),
 
@@ -923,7 +956,17 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, VoidCallback onTap) {
+  void _setWidgetHidden(bool value) {
+    setState(() => _widgetHidden = value);
+    HomeWidgetService.setHidden(value);
+  }
+
+  Widget _buildMenuItem(
+    IconData icon,
+    String title,
+    VoidCallback onTap, {
+    Widget? trailing,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -947,7 +990,12 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            Icon(Icons.chevron_right, color: AppTheme.textSecondary, size: 24),
+            trailing ??
+                Icon(
+                  Icons.chevron_right,
+                  color: AppTheme.textSecondary,
+                  size: 24,
+                ),
           ],
         ),
       ),

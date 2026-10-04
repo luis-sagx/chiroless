@@ -34,6 +34,18 @@
             </intent-filter>
         </activity>
         
+        <!-- Widget de registro rápido (gasto / ingreso) -->
+        <receiver android:name=".QuickAddWidget"
+            android:label="Registro rápido"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_add_widget_info"/>
+        </receiver>
+
         <!-- Receptor para reiniciar notificaciones después del boot -->
         <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
             android:exported="false">
