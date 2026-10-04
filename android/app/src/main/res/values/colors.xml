@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#ffffff</color>
+    <color name="widget_bg">#FFFFFF</color>
+    <color name="widget_expense_bg">#FDE8EC</color>
+    <color name="widget_income_bg">#E3F7EF</color>
 </resources>

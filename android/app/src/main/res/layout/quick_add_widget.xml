@@ -4,29 +4,57 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="horizontal"
-    android:padding="8dp">
+    android:padding="6dp">
 
-    <TextView
+    <LinearLayout
         android:id="@+id/widget_add_expense"
         android:layout_width="0dp"
         android:layout_height="match_parent"
+        android:layout_marginEnd="3dp"
         android:layout_weight="1"
-        android:drawableTop="@drawable/ic_shortcut_expense"
+        android:background="@drawable/widget_btn_expense"
         android:gravity="center"
-        android:text="+ Gasto"
-        android:textColor="#F43F5E"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:orientation="horizontal">
 
-    <TextView
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_shortcut_expense" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="Gasto"
+            android:textColor="#F43F5E"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/widget_add_income"
         android:layout_width="0dp"
         android:layout_height="match_parent"
+        android:layout_marginStart="3dp"
         android:layout_weight="1"
-        android:drawableTop="@drawable/ic_shortcut_income"
+        android:background="@drawable/widget_btn_income"
         android:gravity="center"
-        android:text="+ Ingreso"
-        android:textColor="#10B981"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_shortcut_income" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="Ingreso"
+            android:textColor="#10B981"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 </LinearLayout>
