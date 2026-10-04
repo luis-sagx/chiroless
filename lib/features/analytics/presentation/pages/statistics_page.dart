@@ -8,7 +8,10 @@ import '../../data/metrics_service.dart';
 import '../../../budget/presentation/pages/add_budget_page.dart';
 
 class StatisticsPage extends StatefulWidget {
-  const StatisticsPage({Key? key}) : super(key: key);
+  /// Cuando notifica, la página recarga sus datos.
+  final Listenable? refreshListenable;
+
+  const StatisticsPage({super.key, this.refreshListenable});
 
   @override
   State<StatisticsPage> createState() => _StatisticsPageState();
@@ -31,6 +34,13 @@ class _StatisticsPageState extends State<StatisticsPage> {
   void initState() {
     super.initState();
     _loadData();
+    widget.refreshListenable?.addListener(_loadData);
+  }
+
+  @override
+  void dispose() {
+    widget.refreshListenable?.removeListener(_loadData);
+    super.dispose();
   }
 
   Future<void> _loadData() async {

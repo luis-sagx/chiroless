@@ -46,12 +46,20 @@ class _HomePageState extends State<HomePage> {
   double totalExpense = 0.0;
   List<dynamic> recentTransactions = []; // Mix of Expense and Income
   bool isLoadingTransactions = true;
+  List<String> _topExpenseCategories = [];
+  final ValueNotifier<int> _dataVersion = ValueNotifier<int>(0);
 
   @override
   void initState() {
     super.initState();
     initializeDateFormatting('es', null);
     _loadUser();
+  }
+
+  @override
+  void dispose() {
+    _dataVersion.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUser() async {
@@ -84,12 +92,22 @@ class _HomePageState extends State<HomePage> {
       ]);
       final expenses = results[0] as List<Expense>;
       final incomes = results[1] as List<Income>;
-      final totalExpenses =
-          expenses.fold<double>(0, (sum, expense) => sum + expense.amount);
-      final totalIncomes =
-          incomes.fold<double>(0, (sum, income) => sum + income.amount);
+      final totalExpenses = expenses.fold<double>(
+        0,
+        (sum, expense) => sum + expense.amount,
+      );
+      final totalIncomes = incomes.fold<double>(
+        0,
+        (sum, income) => sum + income.amount,
+      );
       final List<dynamic> combined = [...expenses, ...incomes];
       combined.sort((a, b) => b.date.compareTo(a.date));
+      final counts = <String, int>{};
+      for (final e in expenses) {
+        counts[e.category] = (counts[e.category] ?? 0) + 1;
+      }
+      final topCategories = counts.keys.toList()
+        ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
 
       if (mounted) {
         setState(() {
@@ -97,6 +115,7 @@ class _HomePageState extends State<HomePage> {
           totalIncome = totalIncomes;
           totalExpense = totalExpenses;
           recentTransactions = combined.take(5).toList();
+          _topExpenseCategories = topCategories;
           isLoadingTransactions = false;
         });
       }
@@ -151,6 +170,7 @@ class _HomePageState extends State<HomePage> {
     );
     if (result == true) {
       _loadUser(); // Reload to update balance
+      _dataVersion.value++;
     }
   }
 
@@ -161,6 +181,7 @@ class _HomePageState extends State<HomePage> {
     );
     if (result == true) {
       _loadUser(); // Reload to update balance
+      _dataVersion.value++;
     }
   }
 
@@ -188,24 +209,28 @@ class _HomePageState extends State<HomePage> {
     return surveyService.canCompletePostSurvey(appUser!.createdAt);
   }
 
-  void _showAddTransactionOptions() async {
+  void _showAddTransactionOptions({bool isExpense = true}) async {
     final result = await showModalBottomSheet<QuickAddResult>(
-      context: this.context,
+      context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => const QuickAddSheet(),
+      builder: (context) => QuickAddSheet(
+        initialIsExpense: isExpense,
+        expenseCategoryOrder: _topExpenseCategories,
+      ),
     );
     if (result != null && mounted) {
       _applyOptimisticTransaction(result);
-      ScaffoldMessenger.of(this.context).showSnackBar(
+      _dataVersion.value++;
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             result.isExpense ? 'Gasto guardado' : 'Ingreso guardado',
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: AppTheme.incomeColor,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -213,6 +238,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _applyOptimisticTransaction(QuickAddResult result) {
+    final now = DateTime.now();
+    if (result.date.year != now.year || result.date.month != now.month) return;
     setState(() {
       if (result.isExpense) {
         totalExpense += result.amount;
@@ -232,7 +259,7 @@ class _HomePageState extends State<HomePage> {
           index: _selectedIndex,
           children: [
             _buildHomeContent(),
-            const StatisticsPage(),
+            StatisticsPage(refreshListenable: _dataVersion),
             Container(), // Placeholder for center button
             const AchievementsPage(),
             _buildProfileContent(),
@@ -824,7 +851,9 @@ class _HomePageState extends State<HomePage> {
     final String title = isExpense ? transaction.category : transaction.source;
     final double amount = isExpense ? transaction.amount : transaction.amount;
     final DateTime date = transaction.date;
-    final Color color = isExpense ? AppTheme.expenseColor : AppTheme.incomeColor;
+    final Color color = isExpense
+        ? AppTheme.expenseColor
+        : AppTheme.incomeColor;
     final CategoryInfo info = isExpense
         ? TransactionCategories.expenseInfo(title)
         : TransactionCategories.incomeInfo(title);

@@ -13,7 +13,7 @@ Ruta: inline por instrucción explícita del usuario, aunque varias fases abarca
 - [ ] 2 Fase 2 — código y APK debug verificados en commit 2bd86b5; pendiente Firebase Console y prueba de chat en dispositivo. `flutter test` pasó, análisis: 0 errores/0 warnings y 140 infos; APK debug compiló. Desviación: Kotlin 2.3.0 y `compilerOptions` por incompatibilidad de Gradle. Ruta inline por pedido del usuario.
 - [x] 3 Fase 3 — parser local (TDD). RED: faltaba `local_transaction_parser.dart`; GREEN: `flutter test --no-pub` 12/12. Análisis: 0 errores/0 warnings, 140 infos. Ruta inline por pedido del usuario; commit registrado abajo.
 - [x] 4 Fase 4 — servicio de extracción IA texto/foto; `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (141 infos), `flutter test --no-pub` 12/12, APK debug compilado. Prueba real de IA pendiente de Firebase Console y UI (fase 5). Ruta inline por pedido del usuario; commit registrado abajo.
-- [ ] 5 Fase 5 — QuickAddSheet inteligente
+- [ ] 5 Fase 5 — código integrado (texto, voz, foto, home y refresco de estadísticas); `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (135 infos), `flutter test --no-pub` 12/12 y APK debug compilado. Pendiente prueba manual Android (no hay dispositivo conectado) y Firebase Console. El cambio supera la heurística de 400 líneas porque reemplaza el sheet completo según el plan. El guardado ahora espera a Firestore para evitar falsos éxitos y refrescos prematuros. Ruta inline por pedido del usuario; commit registrado abajo.
 - [ ] 6 Fase 6 — App shortcuts
 - [ ] 7 Fase 7 — gráficas
 - [ ] 8 Fase 8 — estilo
