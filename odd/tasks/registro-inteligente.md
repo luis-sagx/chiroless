@@ -27,6 +27,7 @@ Ruta: inline por instrucción explícita del usuario, aunque varias fases abarca
 - Fase 6: `7bf27f6`.
 - Fase 7: `f3c1eaa`.
 - Fase 8: `149a339`.
+- Fase 9 (documentación y verificaciones automáticas): `ed16990`.
 
 ## Próximo paso
 - Usuario: completar AI Logic, SHA-256 debug, registro de App Check con Play Integrity y alta del token debug en Firebase Console; no activar enforcement de Firestore/Auth. No guardar el token en el repositorio.
