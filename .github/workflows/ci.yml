@@ -1,0 +1,21 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      # Archivos gitignored que el build necesita
+      - run: cp lib/firebase_options.dart.example lib/firebase_options.dart && touch .env
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test --coverage
+      - run: tool/check_coverage.sh 80
