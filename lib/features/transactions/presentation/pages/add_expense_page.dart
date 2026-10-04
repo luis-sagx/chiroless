@@ -1,3 +1,4 @@
+import '../../../../core/constants/transaction_categories.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -26,34 +27,12 @@ class _AddExpensePageState extends State<AddExpensePage> {
   final _budgetService = BudgetService();
   final _notificationService = NotificationService();
 
-  String _selectedCategory = 'Alimentación';
+  String _selectedCategory = TransactionCategories.expense.first.name;
   bool _isImpulsive = false;
   bool _isLoading = false;
   DateTime _selectedDate = DateTime.now();
 
-  final List<String> _categories = [
-    'Alimentación',
-    'Transporte',
-    'Entretenimiento',
-    'Salud',
-    'Educación',
-    'Vivienda',
-    'Ropa',
-    'Servicios',
-    'Otros',
-  ];
-
-  final Map<String, IconData> _categoryIcons = {
-    'Alimentación': Icons.restaurant,
-    'Transporte': Icons.directions_bus,
-    'Entretenimiento': Icons.movie,
-    'Salud': Icons.medical_services,
-    'Educación': Icons.school,
-    'Vivienda': Icons.home,
-    'Ropa': Icons.shopping_bag,
-    'Servicios': Icons.build,
-    'Otros': Icons.more_horiz,
-  };
+  final List<String> _categories = TransactionCategories.expenseNames;
 
   @override
   void dispose() {
@@ -273,7 +252,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
                         child: Row(
                           children: [
                             Icon(
-                              _categoryIcons[category] ?? Icons.category,
+                              TransactionCategories.expenseInfo(category).icon,
                               color: AppTheme.primaryColor,
                             ),
                             const SizedBox(width: 12),

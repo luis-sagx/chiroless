@@ -4,6 +4,9 @@ class AppTheme {
   static const Color primaryColor = Color.fromARGB(255, 33, 49, 73);
   static const Color secondaryColor = Color(0xFFF5C542); // Dorado elegante
   static const Color accentColor = Color(0xFF3B82F6); // Azul moderno suave
+  static const Color incomeColor = Color(0xFF10B981); // Verde esmeralda
+  static const Color expenseColor = Color(0xFFF43F5E); // Rosa/rojo suave
+  static const Color borderColor = Color(0xFFEEF0F4);
 
   static const Color backgroundColor = Color(0xFFF9FAFB);
   static const Color surfaceColor = Colors.white;

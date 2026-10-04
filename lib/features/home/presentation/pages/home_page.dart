@@ -1,3 +1,4 @@
+import '../../../../core/constants/transaction_categories.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../admin/presentation/pages/admin_page.dart';
@@ -426,7 +427,7 @@ class _HomePageState extends State<HomePage> {
                                     'Ingresos',
                                     '\$${totalIncome.toStringAsFixed(0)}',
                                     Icons.arrow_downward,
-                                    AppTheme.secondaryColor,
+                                    AppTheme.incomeColor,
                                   ),
                                 ),
                                 const SizedBox(width: 16),
@@ -435,7 +436,7 @@ class _HomePageState extends State<HomePage> {
                                     'Gastos',
                                     '\$${totalExpense.toStringAsFixed(0)}',
                                     Icons.arrow_upward,
-                                    AppTheme.accentColor,
+                                    AppTheme.expenseColor,
                                   ),
                                 ),
                               ],
@@ -823,10 +824,10 @@ class _HomePageState extends State<HomePage> {
     final String title = isExpense ? transaction.category : transaction.source;
     final double amount = isExpense ? transaction.amount : transaction.amount;
     final DateTime date = transaction.date;
-    final Color color = isExpense
-        ? AppTheme.accentColor
-        : AppTheme.secondaryColor;
-    final IconData icon = isExpense ? Icons.arrow_upward : Icons.arrow_downward;
+    final Color color = isExpense ? AppTheme.expenseColor : AppTheme.incomeColor;
+    final CategoryInfo info = isExpense
+        ? TransactionCategories.expenseInfo(title)
+        : TransactionCategories.incomeInfo(title);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -847,10 +848,10 @@ class _HomePageState extends State<HomePage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: info.color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(info.icon, color: info.color, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(

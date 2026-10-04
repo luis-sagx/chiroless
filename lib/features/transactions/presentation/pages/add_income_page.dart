@@ -1,3 +1,4 @@
+import '../../../../core/constants/transaction_categories.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -26,27 +27,7 @@ class _AddIncomePageState extends State<AddIncomePage> {
   bool _isLoading = false;
   DateTime _selectedDate = DateTime.now();
 
-  final List<String> _sources = [
-    'Salario',
-    'Freelance',
-    'Negocio',
-    'Inversiones',
-    'Regalo',
-    'Beca',
-    'Padres',
-    'Otros',
-  ];
-
-  final Map<String, IconData> _sourceIcons = {
-    'Salario': Icons.work,
-    'Freelance': Icons.laptop,
-    'Negocio': Icons.business,
-    'Inversiones': Icons.trending_up,
-    'Regalo': Icons.card_giftcard,
-    'Beca': Icons.school,
-    'Padres': Icons.family_restroom,
-    'Otros': Icons.more_horiz,
-  };
+  final List<String> _sources = TransactionCategories.incomeNames;
 
   @override
   void dispose() {
@@ -236,7 +217,7 @@ class _AddIncomePageState extends State<AddIncomePage> {
                         child: Row(
                           children: [
                             Icon(
-                              _sourceIcons[source] ?? Icons.attach_money,
+                              TransactionCategories.incomeInfo(source).icon,
                               color: AppTheme.secondaryColor,
                             ),
                             const SizedBox(width: 12),
