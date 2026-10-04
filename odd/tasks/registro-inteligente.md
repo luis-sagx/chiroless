@@ -8,6 +8,8 @@ Delivery: ask-on-risk; 2350 líneas acumuladas aprox. (sin lock, registrantes ge
 Ruta: inline por instrucción explícita del usuario, aunque varias fases abarcan múltiples archivos. Pronóstico: unas 1800–2400 líneas modificadas, excluidos archivos generados. Mirror Engram pendiente: sus herramientas no están disponibles en este entorno.
 
 ## Tareas
+- [ ] 10 Claridad del registro rápido: texto y voz con acciones explícitas, ocultar entrada de foto/cámara, selección de categoría sin visto. Ruta inline por instrucción del usuario; afecta el widget existente. Comprobar con analyze, test y APK debug; revisión visual Android pendiente del usuario.
+- [ ] 11 Retirar encuestas inicial y final del flujo: registro directo a Inicio, sin acceso a encuesta final; eliminar código de encuesta sin otros consumidores. Ruta inline por instrucción del usuario; afecta registro, inicio y módulo de encuestas. Comprobar referencias, analyze, test y APK debug.
 - [x] 0 Fase 0 — commit 7aac48e
 - [x] 1 Fase 1 — commit eb3de6a (ruta: inline por pedido del usuario; analyze 0 err/0 warn, test ok)
 - [ ] 2 Fase 2 — código y APK debug verificados en commit 2bd86b5; pendiente Firebase Console y prueba de chat en dispositivo. `flutter test` pasó, análisis: 0 errores/0 warnings y 140 infos; APK debug compiló. Desviación: Kotlin 2.3.0 y `compilerOptions` por incompatibilidad de Gradle. Ruta inline por pedido del usuario.
@@ -30,6 +32,7 @@ Ruta: inline por instrucción explícita del usuario, aunque varias fases abarca
 - Fase 9 (documentación y verificaciones automáticas): `ed16990`.
 
 ## Próximo paso
+- Cambio aceptado por el usuario: aclarar entrada inteligente, quitar cámara del formulario, evitar visto sobre iconos y retirar ambas encuestas. Pronóstico adicional: ~180–260 líneas authored; se conserva `firebase.json` generado por FlutterFire. TDD off (configuración previa); runner `flutter test --no-pub`. Engram sigue sin estar disponible.
 - Usuario: completar AI Logic, SHA-256 debug, registro de App Check con Play Integrity y alta del token debug en Firebase Console; no activar enforcement de Firestore/Auth. No guardar el token en el repositorio.
 - Con un Android disponible, probar chat de IA y los criterios manuales de texto, voz, foto, estadísticas, gráficos y accesos directos del plan.
 - Engram y `gentle-ai` no están disponibles aquí: la copia de recuperación y la evaluación RDD quedan pendientes; no se ejecutó revisión nativa.

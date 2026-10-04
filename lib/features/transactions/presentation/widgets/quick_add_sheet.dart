@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -56,7 +55,6 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
   final _firebaseService = FirebaseService();
   final _extractionService = TransactionExtractionService();
   final _speech = SpeechToText();
-  final _imagePicker = ImagePicker();
 
   late bool _isExpense;
   late String _selectedCategory;
@@ -197,44 +195,6 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
     );
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    if (_isInterpreting) return;
-    final XFile? image;
-    try {
-      image = await _imagePicker.pickImage(
-        source: source,
-        maxWidth: 1280,
-        imageQuality: 70,
-      );
-    } catch (e) {
-      setState(() => _smartMessage = 'No se pudo abrir la imagen');
-      return;
-    }
-    if (image == null || !mounted) return;
-
-    setState(() {
-      _isInterpreting = true;
-      _smartMessage = 'Leyendo comprobante…';
-    });
-    final bytes = await image.readAsBytes();
-    final mimeType =
-        image.mimeType ??
-        (image.path.toLowerCase().endsWith('.png')
-            ? 'image/png'
-            : 'image/jpeg');
-    final draft = await _extractionService.fromImage(bytes, mimeType);
-    if (!mounted) return;
-    setState(() => _isInterpreting = false);
-    if (draft == null) {
-      setState(
-        () => _smartMessage =
-            'No pude leer el comprobante. Ingresa los datos a mano.',
-      );
-      return;
-    }
-    _applyDraft(draft, 'Revisa los datos y toca Guardar');
-  }
-
   Future<void> _save() async {
     if (_isSaving || _isInterpreting) return;
     final amount = double.tryParse(_amountController.text.replaceAll(',', '.'));
@@ -319,58 +279,53 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const Text(
+          'Describe tu gasto o ingreso',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Escribe o dicta una frase. Detectaremos el monto, el tipo y la categoría.',
+          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _smartController,
+          textInputAction: TextInputAction.done,
+          onSubmitted: _interpretText,
+          minLines: 1,
+          maxLines: 2,
+          decoration: const InputDecoration(
+            hintText: 'Ej.: Pagué 12,50 por almuerzo ayer',
+            fillColor: AppTheme.backgroundColor,
+          ),
+        ),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
-              child: TextField(
-                controller: _smartController,
-                textInputAction: TextInputAction.done,
-                onSubmitted: _interpretText,
-                decoration: InputDecoration(
-                  hintText: 'Ej: 12.50 almuerzo ayer',
-                  fillColor: AppTheme.backgroundColor,
-                  prefixIcon: const Icon(Icons.auto_awesome),
-                  suffixIcon: _isInterpreting
-                      ? const Padding(
-                          padding: EdgeInsets.all(14),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : IconButton(
-                          icon: const Icon(Icons.send),
-                          onPressed: () =>
-                              _interpretText(_smartController.text),
-                        ),
-                ),
+              child: FilledButton.icon(
+                onPressed: _isInterpreting
+                    ? null
+                    : () => _interpretText(_smartController.text),
+                icon: _isInterpreting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.auto_awesome, size: 18),
+                label: Text(_isInterpreting ? 'Interpretando' : 'Interpretar'),
               ),
             ),
-            const SizedBox(width: 4),
-            IconButton(
-              tooltip: 'Dictar',
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
               onPressed: _isInterpreting ? null : _toggleListening,
               icon: Icon(
                 _isListening ? Icons.stop_circle : Icons.mic,
-                color: _isListening ? AppTheme.expenseColor : null,
+                size: 18,
               ),
-            ),
-            PopupMenuButton<ImageSource>(
-              tooltip: 'Leer comprobante',
-              enabled: !_isInterpreting,
-              icon: const Icon(Icons.photo_camera_outlined),
-              onSelected: _pickImage,
-              itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: ImageSource.gallery,
-                  child: Text('Captura de la galería'),
-                ),
-                PopupMenuItem(
-                  value: ImageSource.camera,
-                  child: Text('Tomar foto'),
-                ),
-              ],
+              label: Text(_isListening ? 'Detener' : 'Dictar'),
             ),
           ],
         ),
@@ -453,7 +408,6 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _amountController,
-                  autofocus: true,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
@@ -511,6 +465,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
                     final selected = option == _selectedCategory;
                     final info = _infoOf(option);
                     return ChoiceChip(
+                      showCheckmark: false,
                       avatar: Icon(
                         info.icon,
                         size: 18,

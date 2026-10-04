@@ -145,7 +145,7 @@ Configuraciones y servicios globales:
 
 - Texto libre: `QuickAddSheet` usa `LocalTransactionParser` sin red; si faltan datos, consulta `TransactionExtractionService`. El usuario revisa y confirma el borrador antes de guardarlo.
 - Voz: `speech_to_text` convierte el dictado en texto y lo envía al mismo flujo de interpretación.
-- Foto: `image_picker` obtiene una captura o foto de un comprobante; `TransactionExtractionService` extrae un borrador con Gemini para que el usuario lo confirme.
+- La entrada de foto y cámara está temporalmente retirada del registro rápido. `TransactionExtractionService` conserva la extracción de imágenes para una futura interfaz.
 - Accesos directos: `quick_actions` ofrece «Nuevo gasto» y «Nuevo ingreso» y conserva la acción hasta que `HomePage` pueda abrir el sheet.
 - IA: Firebase AI Logic usa App Check; la app no incluye una API key de Gemini. La configuración de AI Logic y App Check se completa en Firebase Console.
 - Categorías: `TransactionCategories` define nombres, íconos y colores para gastos e ingresos en un solo lugar.
