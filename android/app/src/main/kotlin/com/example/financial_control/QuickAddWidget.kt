@@ -12,7 +12,7 @@ import android.view.View
 import android.widget.RemoteViews
 
 /**
- * Widget de pantalla de inicio: resumen del mes + botones "+ Gasto" / "Ingreso".
+ * Widget de pantalla de inicio: resumen del mes + botones "↑ Gasto" / "↓ Ingreso".
  * Los botones abren MainActivity con el mismo extra que usan los accesos directos
  * de quick_actions, así ShortcutService recibe el tipo sin código Dart extra.
  * Los datos los escribe la app vía MethodChannel "sagx/widget" (MainActivity).
