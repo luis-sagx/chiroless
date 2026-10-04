@@ -16,7 +16,7 @@ Ruta: inline por instrucción explícita del usuario, aunque varias fases abarca
 - [ ] 5 Fase 5 — código integrado (texto, voz, foto, home y refresco de estadísticas); `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (135 infos), `flutter test --no-pub` 12/12 y APK debug compilado. Pendiente prueba manual Android (no hay dispositivo conectado) y Firebase Console. El cambio supera la heurística de 400 líneas porque reemplaza el sheet completo según el plan. El guardado ahora espera a Firestore para evitar falsos éxitos y refrescos prematuros. Ruta inline por pedido del usuario; commit registrado abajo.
 - [ ] 6 Fase 6 — accesos directos implementados; `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (136 infos), `flutter test --no-pub` 12/12, APK debug compilado. Pruebas de pulsación y arranque desde Android pendientes: no hay dispositivo conectado. Ruta inline por pedido del usuario; commit registrado abajo.
 - [ ] 7 Fase 7 — dona, tendencia de 6 meses y ritmo del presupuesto implementados; `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (132 infos), `flutter test --no-pub` 12/12 y APK debug compilado. Revisar gráficas visualmente en Android queda pendiente por falta de dispositivo. Ruta inline por pedido del usuario; commit registrado abajo.
-- [ ] 8 Fase 8 — estilo
+- [ ] 8 Fase 8 — fuente Plus Jakarta Sans, `AppCard`, balance animado y botón `+` destacados; sin `withOpacity` en `lib`. `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings, 80 infos (9 `deprecated_member_use`, base 69); `flutter test --no-pub` 12/12, APK debug compilado. Revisión visual en Android pendiente. Ruta inline por pedido del usuario; commit registrado abajo.
 - [ ] 9 Fase 9 — verificación final + docs
 
 ## Evidencia de commits de esta continuación
@@ -25,3 +25,4 @@ Ruta: inline por instrucción explícita del usuario, aunque varias fases abarca
 - Fase 4: `5739a08`.
 - Fase 5: `7a4f8b4`.
 - Fase 6: `7bf27f6`.
+- Fase 7: `f3c1eaa`.

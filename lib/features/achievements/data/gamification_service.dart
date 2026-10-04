@@ -41,7 +41,10 @@ class GamificationService {
         if (existingAchievement != null &&
             existingAchievement.unlockedAt == null &&
             existingAchievement.id != null) {
-          await _db.collection('achievements').doc(existingAchievement.id).delete();
+          await _db
+              .collection('achievements')
+              .doc(existingAchievement.id)
+              .delete();
         }
 
         // Si ya está desbloqueado (tiene unlockedAt), skip
@@ -68,8 +71,7 @@ class GamificationService {
               final impulsivePercentage = totalExpenses > 0
                   ? (impulsiveExpenses / totalExpenses) * 100
                   : 0;
-              shouldUnlock =
-                  expenses.length >= 10 && impulsivePercentage < 20;
+              shouldUnlock = expenses.length >= 10 && impulsivePercentage < 20;
             }
             break;
 

@@ -119,7 +119,7 @@ class _AddIncomePageState extends State<AddIncomePage> {
                   gradient: LinearGradient(
                     colors: [
                       AppTheme.secondaryColor,
-                      AppTheme.secondaryColor.withOpacity(0.8),
+                      AppTheme.secondaryColor.withValues(alpha: 0.8),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -304,10 +304,10 @@ class _AddIncomePageState extends State<AddIncomePage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.secondaryColor.withOpacity(0.1),
+                  color: AppTheme.secondaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppTheme.secondaryColor.withOpacity(0.3),
+                    color: AppTheme.secondaryColor.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(

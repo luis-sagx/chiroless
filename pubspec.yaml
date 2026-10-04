@@ -59,6 +59,7 @@ dependencies:
   speech_to_text: ^7.5.0
   image_picker: ^1.2.3
   quick_actions: ^1.1.1
+  google_fonts: ^8.2.1
 
 dev_dependencies:
   flutter_test:

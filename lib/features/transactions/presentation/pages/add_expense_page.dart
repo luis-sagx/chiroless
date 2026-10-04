@@ -119,8 +119,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
             body:
                 'Te has excedido en \$${remaining.abs().toStringAsFixed(2)}. Revisa tus finanzas.',
           );
-        } else if (progress > 80 &&
-            (progress - (amount / limit * 100)) <= 80) {
+        } else if (progress > 80 && (progress - (amount / limit * 100)) <= 80) {
           await _notificationService.showNotification(
             id: 998,
             title: 'Cuidado con tus gastos',
@@ -337,7 +336,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: _isImpulsive
-                      ? AppTheme.accentColor.withOpacity(0.1)
+                      ? AppTheme.accentColor.withValues(alpha: 0.1)
                       : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(

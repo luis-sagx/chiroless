@@ -120,7 +120,7 @@ class _AchievementsPageState extends State<AchievementsPage> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.3),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
                     blurRadius: 15,
                     offset: const Offset(0, 5),
                   ),
@@ -161,7 +161,9 @@ class _AchievementsPageState extends State<AchievementsPage> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.2,
+                                      ),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Row(
@@ -196,7 +198,7 @@ class _AchievementsPageState extends State<AchievementsPage> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -235,11 +237,12 @@ class _AchievementsPageState extends State<AchievementsPage> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: LinearProgressIndicator(
-                          value: ((_userPoints - _currentLevelPoints) /
-                                  (_nextLevelPoints - _currentLevelPoints))
-                              .clamp(0.0, 1.0),
+                          value:
+                              ((_userPoints - _currentLevelPoints) /
+                                      (_nextLevelPoints - _currentLevelPoints))
+                                  .clamp(0.0, 1.0),
                           minHeight: 12,
-                          backgroundColor: Colors.white.withOpacity(0.2),
+                          backgroundColor: Colors.white.withValues(alpha: 0.2),
                           valueColor: const AlwaysStoppedAnimation<Color>(
                             Colors.amber,
                           ),
@@ -370,12 +373,12 @@ class _AchievementsPageState extends State<AchievementsPage> {
         color: isUnlocked ? Colors.white : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(16),
         border: isUnlocked
-            ? Border.all(color: AppTheme.secondaryColor.withOpacity(0.3))
+            ? Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.3))
             : null,
         boxShadow: isUnlocked
             ? [
                 BoxShadow(
-                  color: AppTheme.secondaryColor.withOpacity(0.1),
+                  color: AppTheme.secondaryColor.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
@@ -388,7 +391,7 @@ class _AchievementsPageState extends State<AchievementsPage> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: isUnlocked
-                  ? AppTheme.secondaryColor.withOpacity(0.1)
+                  ? AppTheme.secondaryColor.withValues(alpha: 0.1)
                   : Colors.grey.shade300,
               borderRadius: BorderRadius.circular(12),
             ),
