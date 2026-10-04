@@ -4,7 +4,7 @@ Objetivo: registro de ingresos/gastos fácil (texto libre, voz, foto, atajos), g
 Fuente de verdad: `PLAN_REGISTRO_INTELIGENTE.md` (fases 0–9). Rama: `feat/registro-inteligente`.
 TDD: off salvo Fase 3 (plan lo exige). Runner: `flutter test`. Checks por fase: `flutter analyze` (0 err/0 warn), `flutter test`, desde Fase 2 `flutter build apk --debug`.
 Autorizado: Fases 0–9 por el pedido actual de continuar las fases restantes inline en esta rama. D1: no está en Play Store, solo local; a futuro sí. La configuración de Firebase Console y la prueba en dispositivo dependen del usuario.
-Delivery: ask-on-risk. Push/PR/merge: decisión del usuario. Commits sin coautor (pedido del usuario).
+Delivery: ask-on-risk; 2350 líneas acumuladas aprox. (sin lock, registrantes generados ni seguimiento). La estrategia de PR encadenados queda pendiente para cuando el usuario quiera publicar; esta solicitud solo autoriza trabajar en la rama. Push/PR/merge: decisión del usuario. Commits sin coautor (pedido del usuario).
 Ruta: inline por instrucción explícita del usuario, aunque varias fases abarcan múltiples archivos. Pronóstico: unas 1800–2400 líneas modificadas, excluidos archivos generados. Mirror Engram pendiente: sus herramientas no están disponibles en este entorno.
 
 ## Tareas
@@ -17,7 +17,7 @@ Ruta: inline por instrucción explícita del usuario, aunque varias fases abarca
 - [ ] 6 Fase 6 — accesos directos implementados; `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (136 infos), `flutter test --no-pub` 12/12, APK debug compilado. Pruebas de pulsación y arranque desde Android pendientes: no hay dispositivo conectado. Ruta inline por pedido del usuario; commit registrado abajo.
 - [ ] 7 Fase 7 — dona, tendencia de 6 meses y ritmo del presupuesto implementados; `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (132 infos), `flutter test --no-pub` 12/12 y APK debug compilado. Revisar gráficas visualmente en Android queda pendiente por falta de dispositivo. Ruta inline por pedido del usuario; commit registrado abajo.
 - [ ] 8 Fase 8 — fuente Plus Jakarta Sans, `AppCard`, balance animado y botón `+` destacados; sin `withOpacity` en `lib`. `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings, 80 infos (9 `deprecated_member_use`, base 69); `flutter test --no-pub` 12/12, APK debug compilado. Revisión visual en Android pendiente. Ruta inline por pedido del usuario; commit registrado abajo.
-- [ ] 9 Fase 9 — verificación final + docs
+- [ ] 9 Fase 9 — `ARCHITECTURE.md` actualizado y comprobaciones finales: `flutter analyze --no-pub --no-fatal-infos` 0 errores/0 warnings (80 infos, 9 deprecaciones), `flutter test --no-pub` 12/12, `flutter build apk --debug --no-pub` OK, `git diff --check` OK. Falta validación manual Android de fases 2, 5, 6 y 7; `flutter devices` solo muestra Linux y Chrome. Ruta inline por pedido del usuario; commit de documentación registrado abajo.
 
 ## Evidencia de commits de esta continuación
 - Fase 2: `2bd86b5`.
@@ -26,3 +26,9 @@ Ruta: inline por instrucción explícita del usuario, aunque varias fases abarca
 - Fase 5: `7a4f8b4`.
 - Fase 6: `7bf27f6`.
 - Fase 7: `f3c1eaa`.
+- Fase 8: `149a339`.
+
+## Próximo paso
+- Usuario: completar AI Logic, SHA-256 debug, registro de App Check con Play Integrity y alta del token debug en Firebase Console; no activar enforcement de Firestore/Auth. No guardar el token en el repositorio.
+- Con un Android disponible, probar chat de IA y los criterios manuales de texto, voz, foto, estadísticas, gráficos y accesos directos del plan.
+- Engram y `gentle-ai` no están disponibles aquí: la copia de recuperación y la evaluación RDD quedan pendientes; no se ejecutó revisión nativa.

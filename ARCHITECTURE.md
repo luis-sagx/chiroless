@@ -135,10 +135,21 @@ Configuraciones y servicios globales:
 
 ## 🚀 Arranque y UX
 
-- `main.dart` solo espera `EnvConfig.load()` y `Firebase.initializeApp()` antes de `runApp`.
+- `main.dart` espera `EnvConfig.load()`, `Firebase.initializeApp()` y la activación de App Check antes de `runApp`.
 - Las notificaciones se inicializan en background con `_initNotifications()`, para no bloquear el primer frame.
+- Los accesos directos se inicializan en background con `_initShortcuts()`.
 - `SplashScreen` anima el logo por `700 ms` y navega al terminar la animación, sin delay fijo.
-- El botón central `+` del home abre `QuickAddSheet`, que registra gastos/ingresos con `unawaited(...)` para aprovechar la persistencia offline de Firestore y cerrar la UI al instante.
+- El botón central `+` del home abre `QuickAddSheet`, que espera el resultado de Firestore antes de confirmar el guardado y actualizar las estadísticas.
+
+## ✍️ Registro inteligente
+
+- Texto libre: `QuickAddSheet` usa `LocalTransactionParser` sin red; si faltan datos, consulta `TransactionExtractionService`. El usuario revisa y confirma el borrador antes de guardarlo.
+- Voz: `speech_to_text` convierte el dictado en texto y lo envía al mismo flujo de interpretación.
+- Foto: `image_picker` obtiene una captura o foto de un comprobante; `TransactionExtractionService` extrae un borrador con Gemini para que el usuario lo confirme.
+- Accesos directos: `quick_actions` ofrece «Nuevo gasto» y «Nuevo ingreso» y conserva la acción hasta que `HomePage` pueda abrir el sheet.
+- IA: Firebase AI Logic usa App Check; la app no incluye una API key de Gemini. La configuración de AI Logic y App Check se completa en Firebase Console.
+- Categorías: `TransactionCategories` define nombres, íconos y colores para gastos e ingresos en un solo lugar.
+- Estadísticas: el home notifica los guardados y la página recarga la dona por categoría, la tendencia de seis meses y el ritmo frente al presupuesto.
 
 ## 🏆 Gamificación
 
@@ -159,8 +170,8 @@ Ejemplo:
 ```dart
 // Registro rápido desde el home
 QuickAddSheet() → transactionService.createExpense()/createIncome()
-                → Firestore local/offline cache
-                → Navigator.pop() inmediato
+                → Firestore
+                → Navigator.pop() tras confirmar el guardado
                 → HomePage aplica balance optimista
                 → GamificationService.onTransactionRegistered() en background
 ```
