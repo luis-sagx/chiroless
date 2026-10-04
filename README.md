@@ -10,7 +10,6 @@ Desarrollar una aplicación móvil que permita a los estudiantes universitarios:
 - 📊 Visualizar métricas financieras
 - 🤖 Recibir recomendaciones basadas en IA
 - 🎮 Mejorar hábitos mediante gamificación
-- 📈 Evaluar impacto Pre/Post uso de la app
 
 ## 🏗️ Arquitectura
 
@@ -118,17 +117,6 @@ flutter test
 ```
 
 Ver más en [ARCHITECTURE.md](ARCHITECTURE.md).
-
-## 🎓 Contexto Académico
-
-Este proyecto es parte de una investigación para evaluar el impacto de aplicaciones móviles con IA y gamificación en el comportamiento financiero de estudiantes universitarios.
-
-### Metodología
-
-1. **Pre-test**: Evaluación inicial de hábitos financieros
-2. **Intervención**: Uso de la app por 2 semanas
-3. **Post-test**: Re-evaluación de comportamiento
-4. **Análisis**: Comparación de métricas Pre/Post
 
 ## 👥 Contribuir
 

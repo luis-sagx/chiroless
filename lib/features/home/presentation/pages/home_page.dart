@@ -1,3 +1,6 @@
+import '../../../../core/constants/transaction_categories.dart';
+import '../../../../shared/widgets/app_card.dart';
+import '../../../../core/services/shortcut_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../admin/presentation/pages/admin_page.dart';
@@ -14,12 +17,12 @@ import '../../../profile/presentation/pages/edit_profile_page.dart';
 import '../../../profile/presentation/pages/help_page.dart';
 import '../../../profile/presentation/pages/about_page.dart';
 import '../../../profile/presentation/pages/terms_conditions_page.dart';
-import '../../../survey/presentation/pages/survey_page.dart';
-import '../../../survey/data/survey_service.dart';
 import '../../../ai_assistant/presentation/pages/ai_assistant_page.dart';
 import '../../../transactions/data/transaction_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../../../models/expense_model.dart';
+import '../../../../models/income_model.dart';
+import '../../../transactions/presentation/widgets/quick_add_sheet.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -34,7 +37,6 @@ class _HomePageState extends State<HomePage> {
   final service = FirebaseService();
   final userService = UserService();
   final transactionService = TransactionService();
-  final surveyService = SurveyService();
   int _selectedIndex = 0;
   AppUser? appUser;
   bool isLoadingUser = true;
@@ -43,17 +45,36 @@ class _HomePageState extends State<HomePage> {
   double totalExpense = 0.0;
   List<dynamic> recentTransactions = []; // Mix of Expense and Income
   bool isLoadingTransactions = true;
+  List<String> _topExpenseCategories = [];
+  final ValueNotifier<int> _dataVersion = ValueNotifier<int>(0);
 
   @override
   void initState() {
     super.initState();
     initializeDateFormatting('es', null);
     _loadUser();
+    ShortcutService.pending.addListener(_handleShortcut);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleShortcut());
+  }
+
+  @override
+  void dispose() {
+    ShortcutService.pending.removeListener(_handleShortcut);
+    _dataVersion.dispose();
+    super.dispose();
+  }
+
+  void _handleShortcut() {
+    final type = ShortcutService.pending.value;
+    if (type == null || !mounted) return;
+    ShortcutService.pending.value = null;
+    _showAddTransactionOptions(isExpense: type != ShortcutService.addIncome);
   }
 
   Future<void> _loadUser() async {
     final user = service.currentUser;
     if (user != null) {
+      final transactionsFuture = _loadTransactionData();
       final userData = await userService.getUser(user.uid);
       if (mounted) {
         setState(() {
@@ -61,8 +82,7 @@ class _HomePageState extends State<HomePage> {
           isLoadingUser = false;
         });
       }
-      // Load transaction data
-      await _loadTransactionData();
+      await transactionsFuture;
     }
   }
 
@@ -75,20 +95,36 @@ class _HomePageState extends State<HomePage> {
     }
 
     try {
-      final summary = await transactionService.getMonthSummary(user.uid);
-      final expenses = await transactionService.getUserExpenses(user.uid);
-      final incomes = await transactionService.getUserIncomes(user.uid);
-
-      // Combine and sort by date
+      final results = await Future.wait([
+        transactionService.getUserExpenses(user.uid),
+        transactionService.getUserIncomes(user.uid),
+      ]);
+      final expenses = results[0] as List<Expense>;
+      final incomes = results[1] as List<Income>;
+      final totalExpenses = expenses.fold<double>(
+        0,
+        (sum, expense) => sum + expense.amount,
+      );
+      final totalIncomes = incomes.fold<double>(
+        0,
+        (sum, income) => sum + income.amount,
+      );
       final List<dynamic> combined = [...expenses, ...incomes];
       combined.sort((a, b) => b.date.compareTo(a.date));
+      final counts = <String, int>{};
+      for (final e in expenses) {
+        counts[e.category] = (counts[e.category] ?? 0) + 1;
+      }
+      final topCategories = counts.keys.toList()
+        ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
 
       if (mounted) {
         setState(() {
-          totalBalance = summary['balance'] ?? 0.0;
-          totalIncome = summary['totalIncomes'] ?? 0.0;
-          totalExpense = summary['totalExpenses'] ?? 0.0;
-          recentTransactions = combined.take(5).toList(); // Only 5 most recent
+          totalBalance = totalIncomes - totalExpenses;
+          totalIncome = totalIncomes;
+          totalExpense = totalExpenses;
+          recentTransactions = combined.take(5).toList();
+          _topExpenseCategories = topCategories;
           isLoadingTransactions = false;
         });
       }
@@ -143,6 +179,7 @@ class _HomePageState extends State<HomePage> {
     );
     if (result == true) {
       _loadUser(); // Reload to update balance
+      _dataVersion.value++;
     }
   }
 
@@ -153,6 +190,7 @@ class _HomePageState extends State<HomePage> {
     );
     if (result == true) {
       _loadUser(); // Reload to update balance
+      _dataVersion.value++;
     }
   }
 
@@ -166,125 +204,46 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Verificar si se puede mostrar la encuesta POST
-  Future<bool> _canShowPostSurvey() async {
-    if (appUser == null) return false;
-
-    // Verificar si ya completó la encuesta POST
-    final hasCompletedPost = await surveyService.hasCompletedPostSurvey(
-      appUser!.uid,
-    );
-    if (hasCompletedPost) return false;
-
-    // Verificar si han pasado 15+ días
-    return surveyService.canCompletePostSurvey(appUser!.createdAt);
-  }
-
-  void _showAddTransactionOptions(BuildContext context) {
-    showModalBottomSheet(
+  void _showAddTransactionOptions({bool isExpense = true}) async {
+    final result = await showModalBottomSheet<QuickAddResult>(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Agregar Transacción',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                      _navigateToAddIncome();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppTheme.secondaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.secondaryColor),
-                      ),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.add_circle_outline,
-                            color: AppTheme.secondaryColor,
-                            size: 48,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Ingreso',
-                            style: TextStyle(
-                              color: AppTheme.secondaryColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                      _navigateToAddExpense();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.accentColor),
-                      ),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.remove_circle_outline,
-                            color: AppTheme.accentColor,
-                            size: 48,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Gasto',
-                            style: TextStyle(
-                              color: AppTheme.accentColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => QuickAddSheet(
+        initialIsExpense: isExpense,
+        expenseCategoryOrder: _topExpenseCategories,
       ),
     );
+    if (result != null && mounted) {
+      _applyOptimisticTransaction(result);
+      _dataVersion.value++;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.isExpense ? 'Gasto guardado' : 'Ingreso guardado',
+          ),
+          backgroundColor: AppTheme.incomeColor,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _applyOptimisticTransaction(QuickAddResult result) {
+    final now = DateTime.now();
+    if (result.date.year != now.year || result.date.month != now.month) return;
+    setState(() {
+      if (result.isExpense) {
+        totalExpense += result.amount;
+        totalBalance -= result.amount;
+      } else {
+        totalIncome += result.amount;
+        totalBalance += result.amount;
+      }
+    });
   }
 
   @override
@@ -295,7 +254,7 @@ class _HomePageState extends State<HomePage> {
           index: _selectedIndex,
           children: [
             _buildHomeContent(),
-            const StatisticsPage(),
+            StatisticsPage(refreshListenable: _dataVersion),
             Container(), // Placeholder for center button
             const AchievementsPage(),
             _buildProfileContent(),
@@ -317,7 +276,7 @@ class _HomePageState extends State<HomePage> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -328,7 +287,7 @@ class _HomePageState extends State<HomePage> {
           onTap: (index) {
             if (index == 2) {
               // Botón central - mostrar opciones
-              _showAddTransactionOptions(context);
+              _showAddTransactionOptions();
             } else {
               setState(() {
                 _selectedIndex = index;
@@ -340,28 +299,34 @@ class _HomePageState extends State<HomePage> {
           selectedItemColor: AppTheme.primaryColor,
           unselectedItemColor: AppTheme.textSecondary,
           elevation: 0,
-          items: const [
-            BottomNavigationBarItem(
+          items: [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
               label: 'Inicio',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.bar_chart_outlined),
               activeIcon: Icon(Icons.bar_chart),
               label: 'Estadísticas',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.add_circle_outline),
-              activeIcon: Icon(Icons.add_circle),
+              icon: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.add, color: Colors.white),
+              ),
               label: 'Agregar',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.emoji_events_outlined),
               activeIcon: Icon(Icons.emoji_events),
               label: 'Logros',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
               label: 'Perfil',
@@ -427,7 +392,7 @@ class _HomePageState extends State<HomePage> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -445,10 +410,10 @@ class _HomePageState extends State<HomePage> {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                       width: 1,
                     ),
                   ),
@@ -472,14 +437,19 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              '\$${totalBalance.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                color: totalBalance >= 0
-                                    ? Colors.white
-                                    : Colors.red.shade200,
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
+                            TweenAnimationBuilder<double>(
+                              tween: Tween<double>(end: totalBalance),
+                              duration: const Duration(milliseconds: 600),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, value, _) => Text(
+                                '\$${value.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  color: totalBalance >= 0
+                                      ? Colors.white
+                                      : Colors.red.shade200,
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -490,7 +460,7 @@ class _HomePageState extends State<HomePage> {
                                     'Ingresos',
                                     '\$${totalIncome.toStringAsFixed(0)}',
                                     Icons.arrow_downward,
-                                    AppTheme.secondaryColor,
+                                    AppTheme.incomeColor,
                                   ),
                                 ),
                                 const SizedBox(width: 16),
@@ -499,7 +469,7 @@ class _HomePageState extends State<HomePage> {
                                     'Gastos',
                                     '\$${totalExpense.toStringAsFixed(0)}',
                                     Icons.arrow_upward,
-                                    AppTheme.accentColor,
+                                    AppTheme.expenseColor,
                                   ),
                                 ),
                               ],
@@ -625,7 +595,7 @@ class _HomePageState extends State<HomePage> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
                     blurRadius: 20,
                     offset: const Offset(0, 5),
                   ),
@@ -670,7 +640,7 @@ class _HomePageState extends State<HomePage> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -727,29 +697,6 @@ class _HomePageState extends State<HomePage> {
               },
             ),
 
-            // Encuesta POST (solo si han pasado 15+ días)
-            FutureBuilder<bool>(
-              future: _canShowPostSurvey(),
-              builder: (context, snapshot) {
-                if (snapshot.data == true) {
-                  return _buildMenuItem(
-                    Icons.assignment_outlined,
-                    'Encuesta Final',
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const SurveyPage(surveyType: 'POST'),
-                        ),
-                      );
-                    },
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-
             const SizedBox(height: 16),
 
             // Logout Button
@@ -762,7 +709,7 @@ class _HomePageState extends State<HomePage> {
                   vertical: 16,
                 ),
                 decoration: BoxDecoration(
-                  color: AppTheme.errorColor.withOpacity(0.1),
+                  color: AppTheme.errorColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
@@ -796,7 +743,7 @@ class _HomePageState extends State<HomePage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -804,7 +751,7 @@ class _HomePageState extends State<HomePage> {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: Colors.white, size: 16),
@@ -850,7 +797,7 @@ class _HomePageState extends State<HomePage> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -861,7 +808,7 @@ class _HomePageState extends State<HomePage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 24),
@@ -888,33 +835,24 @@ class _HomePageState extends State<HomePage> {
     final double amount = isExpense ? transaction.amount : transaction.amount;
     final DateTime date = transaction.date;
     final Color color = isExpense
-        ? AppTheme.accentColor
-        : AppTheme.secondaryColor;
-    final IconData icon = isExpense ? Icons.arrow_upward : Icons.arrow_downward;
+        ? AppTheme.expenseColor
+        : AppTheme.incomeColor;
+    final CategoryInfo info = isExpense
+        ? TransactionCategories.expenseInfo(title)
+        : TransactionCategories.incomeInfo(title);
 
-    return Container(
+    return AppCard(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: info.color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(info.icon, color: info.color, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -960,7 +898,7 @@ class _HomePageState extends State<HomePage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.1),
+              color: AppTheme.primaryColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(

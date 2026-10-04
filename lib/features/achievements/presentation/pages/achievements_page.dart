@@ -4,7 +4,6 @@ import '../../../../core/theme/app_theme.dart';
 import '../../data/gamification_service.dart';
 import '../../../../models/achievement_model.dart';
 import '../../../auth/data/user_service.dart';
-import '../../../../utils/backfill_points.dart';
 
 class AchievementsPage extends StatefulWidget {
   const AchievementsPage({Key? key}) : super(key: key);
@@ -17,13 +16,12 @@ class _AchievementsPageState extends State<AchievementsPage> {
   final _firebaseService = FirebaseService();
   final _gamificationService = GamificationService();
   final _userService = UserService();
-  final _backfillUtility = BackfillPointsUtility();
 
   bool _isLoading = true;
-  bool _isBackfilling = false;
   List<Achievement> _achievements = [];
   int _userPoints = 0;
   int _userLevel = 1;
+  int _currentLevelPoints = 0;
   int _nextLevelPoints = 100;
 
   @override
@@ -45,6 +43,9 @@ class _AchievementsPageState extends State<AchievementsPage> {
       final userData = await _userService.getUser(user.uid);
       final points = userData?.points ?? 0;
       final level = _gamificationService.calculateLevel(points);
+      final currentLevelPoints = _gamificationService.pointsForCurrentLevel(
+        level,
+      );
       final nextLevel = _gamificationService.pointsForNextLevel(level);
 
       // Get all achievements
@@ -56,6 +57,7 @@ class _AchievementsPageState extends State<AchievementsPage> {
         setState(() {
           _userPoints = points;
           _userLevel = level;
+          _currentLevelPoints = currentLevelPoints;
           _nextLevelPoints = nextLevel;
           _achievements = achievements;
           _isLoading = false;
@@ -71,50 +73,6 @@ class _AchievementsPageState extends State<AchievementsPage> {
     }
   }
 
-  Future<void> _backfillPoints() async {
-    setState(() => _isBackfilling = true);
-
-    try {
-      final result = await _backfillUtility.backfillAllPoints();
-
-      if (result['success']) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '¡Puntos actualizados! ${result['totalPoints']} pts por ${result['incomeCount']} ingresos y ${result['expenseCount']} gastos',
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-          // Wait a moment for Firebase to propagate changes
-          await Future.delayed(const Duration(milliseconds: 500));
-          await _loadData(); // Reload to show new points
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${result['error']}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isBackfilling = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -124,8 +82,19 @@ class _AchievementsPageState extends State<AchievementsPage> {
     final unlockedAchievements = _achievements
         .where((a) => a.isUnlocked)
         .toList();
-    final lockedAchievements = _achievements
-        .where((a) => !a.isUnlocked)
+    final unlockedTitles = unlockedAchievements.map((a) => a.title).toSet();
+    final lockedAchievements = AchievementTemplates.templates
+        .where((template) => !unlockedTitles.contains(template['title']))
+        .map(
+          (template) => Achievement(
+            userId: '',
+            title: template['title'] as String,
+            description: template['description'] as String,
+            icon: template['icon'] as String,
+            points: template['points'] as int,
+            category: template['category'] as String,
+          ),
+        )
         .toList();
 
     return RefreshIndicator(
@@ -151,7 +120,7 @@ class _AchievementsPageState extends State<AchievementsPage> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.3),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
                     blurRadius: 15,
                     offset: const Offset(0, 5),
                   ),
@@ -192,7 +161,9 @@ class _AchievementsPageState extends State<AchievementsPage> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.2,
+                                      ),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Row(
@@ -227,7 +198,7 @@ class _AchievementsPageState extends State<AchievementsPage> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -266,9 +237,12 @@ class _AchievementsPageState extends State<AchievementsPage> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: LinearProgressIndicator(
-                          value: _userPoints / _nextLevelPoints,
+                          value:
+                              ((_userPoints - _currentLevelPoints) /
+                                      (_nextLevelPoints - _currentLevelPoints))
+                                  .clamp(0.0, 1.0),
                           minHeight: 12,
-                          backgroundColor: Colors.white.withOpacity(0.2),
+                          backgroundColor: Colors.white.withValues(alpha: 0.2),
                           valueColor: const AlwaysStoppedAnimation<Color>(
                             Colors.amber,
                           ),
@@ -279,74 +253,6 @@ class _AchievementsPageState extends State<AchievementsPage> {
                 ],
               ),
             ),
-            // Sync Points Button (only show if points are 0)
-            if (_userPoints == 0) ...[
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.secondaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppTheme.secondaryColor.withOpacity(0.3),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: AppTheme.secondaryColor,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '¿Tienes transacciones pero no puntos?',
-                            style: TextStyle(
-                              color: AppTheme.secondaryColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Sincroniza tus puntos para recibir crédito por tus transacciones anteriores.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: _isBackfilling ? null : _backfillPoints,
-                      icon: _isBackfilling
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Icon(Icons.sync),
-                      label: Text(
-                        _isBackfilling
-                            ? 'Sincronizando...'
-                            : 'Sincronizar Puntos',
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.secondaryColor,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             const SizedBox(height: 32),
 
             // Unlocked Achievements
@@ -421,7 +327,7 @@ class _AchievementsPageState extends State<AchievementsPage> {
             ],
 
             // Empty State
-            if (_achievements.isEmpty) ...[
+            if (unlockedAchievements.isEmpty && lockedAchievements.isEmpty) ...[
               const SizedBox(height: 60),
               Center(
                 child: Column(
@@ -467,12 +373,12 @@ class _AchievementsPageState extends State<AchievementsPage> {
         color: isUnlocked ? Colors.white : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(16),
         border: isUnlocked
-            ? Border.all(color: AppTheme.secondaryColor.withOpacity(0.3))
+            ? Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.3))
             : null,
         boxShadow: isUnlocked
             ? [
                 BoxShadow(
-                  color: AppTheme.secondaryColor.withOpacity(0.1),
+                  color: AppTheme.secondaryColor.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
@@ -485,7 +391,7 @@ class _AchievementsPageState extends State<AchievementsPage> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: isUnlocked
-                  ? AppTheme.secondaryColor.withOpacity(0.1)
+                  ? AppTheme.secondaryColor.withValues(alpha: 0.1)
                   : Colors.grey.shade300,
               borderRadius: BorderRadius.circular(12),
             ),

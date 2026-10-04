@@ -127,8 +127,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: (notification['color'] as Color).withOpacity(
-                            0.1,
+                          color: (notification['color'] as Color).withValues(
+                            alpha: 0.1,
                           ),
                           shape: BoxShape.circle,
                         ),

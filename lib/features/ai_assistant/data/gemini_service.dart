@@ -1,14 +1,13 @@
-import 'package:google_generative_ai/google_generative_ai.dart';
-import '../../../core/config/env_config.dart';
+import 'package:firebase_ai/firebase_ai.dart';
+import '../../../core/constants/app_constants.dart';
 
 /// Servicio para interactuar con Google Gemini AI
 class GeminiService {
   late final GenerativeModel _model;
 
   GeminiService() {
-    _model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: EnvConfig.geminiApiKey,
+    _model = FirebaseAI.googleAI().generativeModel(
+      model: AppConstants.geminiModel,
     );
   }
 

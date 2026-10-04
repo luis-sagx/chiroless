@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../../models/achievement_model.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../transactions/data/transaction_service.dart';
@@ -26,14 +27,25 @@ class GamificationService {
       }
 
       // Obtener datos necesarios
+      final userSnap = await _db.collection('users').doc(userId).get();
+      final userData = userSnap.data() ?? {};
+      final currentStreak = (userData['currentStreak'] ?? 0) as int;
       final expenses = await _transactionService.getUserExpenses(userId);
       final incomes = await _transactionService.getUserIncomes(userId);
-      final budgetStatus = await _budgetService.getBudgetStatus(userId);
 
       // Verificar cada template
       for (var template in AchievementTemplates.templates) {
         final title = template['title'] as String;
         final existingAchievement = existingAchievementsMap[title];
+
+        if (existingAchievement != null &&
+            existingAchievement.unlockedAt == null &&
+            existingAchievement.id != null) {
+          await _db
+              .collection('achievements')
+              .doc(existingAchievement.id)
+              .delete();
+        }
 
         // Si ya está desbloqueado (tiene unlockedAt), skip
         if (existingAchievement != null &&
@@ -51,29 +63,44 @@ class GamificationService {
             } else if (title == 'Control total') {
               final totalExpenses = expenses.fold<double>(
                 0,
-                (sum, e) => sum + e.amount,
+                (total, expense) => total + expense.amount,
               );
               final impulsiveExpenses = expenses
                   .where((e) => e.isImpulsive)
-                  .fold<double>(0, (sum, e) => sum + e.amount);
+                  .fold<double>(0, (total, expense) => total + expense.amount);
               final impulsivePercentage = totalExpenses > 0
                   ? (impulsiveExpenses / totalExpenses) * 100
                   : 0;
-              shouldUnlock = impulsivePercentage < 20;
+              shouldUnlock = expenses.length >= 10 && impulsivePercentage < 20;
             }
             break;
 
           case 'streak':
             if (title == 'Racha de 7 días') {
-              shouldUnlock = await _checkStreakDays(userId, 7);
+              shouldUnlock = currentStreak >= 7;
             }
             break;
 
           case 'budget':
             if (title == 'Presupuesto cumplido') {
-              if (budgetStatus['hasBudget']) {
-                final percentageUsed = budgetStatus['percentageUsed'] as double;
-                shouldUnlock = percentageUsed <= 100;
+              final now = DateTime.now();
+              final prev = DateTime(now.year, now.month - 1, 1);
+              final prevMonth =
+                  '${prev.year}-${prev.month.toString().padLeft(2, '0')}';
+              final prevBudget = await _budgetService.getBudgetByMonth(
+                userId,
+                prevMonth,
+              );
+              if (prevBudget != null) {
+                final prevExpenses = await _transactionService.getUserExpenses(
+                  userId,
+                  month: prevMonth,
+                );
+                final spent = prevExpenses.fold<double>(
+                  0,
+                  (total, expense) => total + expense.amount,
+                );
+                shouldUnlock = spent <= prevBudget.monthlyLimit;
               }
             }
             break;
@@ -82,56 +109,44 @@ class GamificationService {
             if (title == 'Ahorrador novato') {
               final totalIncome = incomes.fold<double>(
                 0,
-                (sum, i) => sum + i.amount,
+                (total, income) => total + income.amount,
               );
               final totalExpense = expenses.fold<double>(
                 0,
-                (sum, e) => sum + e.amount,
+                (total, expense) => total + expense.amount,
               );
               final savings = totalIncome - totalExpense;
               final savingsPercentage = totalIncome > 0
                   ? (savings / totalIncome) * 100
                   : 0;
-              shouldUnlock = savingsPercentage >= 10;
+              shouldUnlock =
+                  incomes.isNotEmpty &&
+                  expenses.length >= 5 &&
+                  savingsPercentage >= 10;
             }
             break;
         }
 
         // Si debe desbloquearse
         if (shouldUnlock) {
-          if (existingAchievement != null) {
-            // Actualizar logro existente agregando unlockedAt
-            await _db
-                .collection('achievements')
-                .doc(existingAchievement.id)
-                .update({'unlockedAt': FieldValue.serverTimestamp()});
-
-            final updatedAchievement = existingAchievement.copyWith(
-              unlockedAt: DateTime.now(),
-            );
-            unlockedAchievements.add(updatedAchievement);
-
-            // Actualizar puntos del usuario
-            await _addPoints(userId, template['points'] as int);
-          } else {
-            // Crear nuevo logro
-            final achievement = Achievement(
-              userId: userId,
-              title: title,
-              description: template['description'] as String,
-              icon: template['icon'] as String,
-              points: template['points'] as int,
-              category: template['category'] as String,
-            );
-
-            final docRef = await _db
-                .collection('achievements')
-                .add(achievement.toMap());
-            unlockedAchievements.add(achievement.copyWith(id: docRef.id));
-
-            // Actualizar puntos del usuario
-            await _addPoints(userId, template['points'] as int);
-          }
+          final key = template['key'] as String;
+          final docId = '${userId}_$key';
+          final achievement = Achievement(
+            id: docId,
+            userId: userId,
+            title: title,
+            description: template['description'] as String,
+            icon: template['icon'] as String,
+            points: template['points'] as int,
+            category: template['category'] as String,
+            unlockedAt: DateTime.now(),
+          );
+          await _db
+              .collection('achievements')
+              .doc(docId)
+              .set(achievement.toMap(), SetOptions(merge: true));
+          unlockedAchievements.add(achievement);
+          await _addPoints(userId, template['points'] as int);
         }
       }
 
@@ -142,53 +157,30 @@ class GamificationService {
     }
   }
 
-  /// Verificar racha de días consecutivos con transacciones
-  Future<bool> _checkStreakDays(String userId, int requiredDays) async {
+  /// Mantiene la racha diaria de transacciones en el documento del usuario.
+  Future<void> _updateStreak(String userId) async {
     try {
-      final now = DateTime.now();
-      final daysToCheck = requiredDays;
+      final userRef = _db.collection('users').doc(userId);
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(userRef);
+        if (!snap.exists) return;
+        final data = snap.data()!;
+        final now = DateTime.now();
+        final today =
+            '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+        final yesterdayDate = now.subtract(const Duration(days: 1));
+        final yesterday =
+            '${yesterdayDate.year}-${yesterdayDate.month.toString().padLeft(2, '0')}-${yesterdayDate.day.toString().padLeft(2, '0')}';
 
-      // Obtener transacciones de los últimos N días
-      final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-      final expenses = await _transactionService.getUserExpenses(
-        userId,
-        month: month,
-      );
-      final incomes = await _transactionService.getUserIncomes(
-        userId,
-        month: month,
-      );
+        final lastTxDate = data['lastTxDate'] as String?;
+        final currentStreak = (data['currentStreak'] ?? 0) as int;
 
-      // Crear set de fechas con transacciones
-      final Set<String> transactionDates = {};
-      for (var expense in expenses) {
-        final dateStr =
-            '${expense.date.year}-${expense.date.month}-${expense.date.day}';
-        transactionDates.add(dateStr);
-      }
-      for (var income in incomes) {
-        final dateStr =
-            '${income.date.year}-${income.date.month}-${income.date.day}';
-        transactionDates.add(dateStr);
-      }
-
-      // Verificar días consecutivos
-      int consecutiveDays = 0;
-      for (int i = 0; i < daysToCheck; i++) {
-        final checkDate = now.subtract(Duration(days: i));
-        final dateStr = '${checkDate.year}-${checkDate.month}-${checkDate.day}';
-
-        if (transactionDates.contains(dateStr)) {
-          consecutiveDays++;
-        } else {
-          break; // Rompe la racha
-        }
-      }
-
-      return consecutiveDays >= requiredDays;
+        if (lastTxDate == today) return;
+        final newStreak = lastTxDate == yesterday ? currentStreak + 1 : 1;
+        tx.update(userRef, {'currentStreak': newStreak, 'lastTxDate': today});
+      });
     } catch (e) {
-      print('Error verificando racha: $e');
-      return false;
+      print('Error actualizando racha: $e');
     }
   }
 
@@ -215,19 +207,16 @@ class GamificationService {
   /// Agregar puntos al usuario y actualizar nivel
   Future<void> _addPoints(String userId, int points) async {
     try {
-      final userDoc = await _db.collection('users').doc(userId).get();
-      if (!userDoc.exists) return;
-
-      final userData = userDoc.data()!;
-      final currentPoints = userData['points'] ?? 0;
-      final newPoints = currentPoints + points;
-
-      // Calcular nuevo nivel
-      final newLevel = _calculateLevel(newPoints);
-
-      await _db.collection('users').doc(userId).update({
-        'points': newPoints,
-        'level': newLevel,
+      final userRef = _db.collection('users').doc(userId);
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(userRef);
+        if (!snap.exists) return;
+        final current = (snap.data()!['points'] ?? 0) as int;
+        final newPoints = current + points;
+        tx.update(userRef, {
+          'points': newPoints,
+          'level': _calculateLevel(newPoints),
+        });
       });
     } catch (e) {
       print('Error agregando puntos: $e');
@@ -244,36 +233,18 @@ class GamificationService {
     return 'Principiante';
   }
 
-  /// Award points for registering a transaction
-  Future<void> awardPointsForTransaction(
+  /// Punto de entrada único post-transacción. Se llama SIN await desde la UI.
+  /// Nunca lanza excepciones.
+  Future<void> onTransactionRegistered(
     String userId, {
     required bool isExpense,
   }) async {
-    try {
-      // Award 10 points for expense, 15 for income
-      final pointsToAward = isExpense ? 10 : 15;
-      await _addPoints(userId, pointsToAward);
-    } catch (e) {
-      print('Error awarding transaction points: $e');
-    }
-  }
-
-  /// Backfill points for existing transactions (one-time utility)
-  Future<void> backfillPoints(String userId, int totalPoints) async {
-    try {
-      final userDoc = await _db.collection('users').doc(userId).get();
-      if (!userDoc.exists) return;
-
-      // Calculate new level
-      final newLevel = _calculateLevel(totalPoints);
-
-      await _db.collection('users').doc(userId).update({
-        'points': totalPoints,
-        'level': newLevel,
-      });
-    } catch (e) {
-      print('Error backfilling points: $e');
-    }
+    await rewardAction(
+      userId,
+      isExpense ? 'expense_registered' : 'income_registered',
+    );
+    await _updateStreak(userId);
+    await checkAndUnlockAchievements(userId);
   }
 
   /// Calcular nivel numérico basado en puntos (público)
@@ -301,6 +272,24 @@ class GamificationService {
         return 1000;
       default:
         return 1000; // Nivel máximo
+    }
+  }
+
+  /// Puntos mínimos del nivel actual.
+  int pointsForCurrentLevel(int level) {
+    switch (level) {
+      case 1:
+        return 0;
+      case 2:
+        return 150;
+      case 3:
+        return 300;
+      case 4:
+        return 500;
+      case 5:
+        return 750;
+      default:
+        return 1000;
     }
   }
 

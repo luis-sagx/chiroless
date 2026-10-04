@@ -12,14 +12,4 @@ class EnvConfig {
     }
   }
 
-  /// Obtener la API key de Gemini
-  static String get geminiApiKey {
-    final apiKey = dotenv.env['GEMINI_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
-      throw Exception(
-        'GEMINI_API_KEY no encontrada. Configure la variable de entorno.',
-      );
-    }
-    return apiKey;
-  }
 }

@@ -256,6 +256,33 @@ class TransactionService {
     }
   }
 
+  /// Totales de los últimos [months] meses (incluye el actual), del más
+  /// antiguo al más reciente.
+  /// ponytail: 2 consultas por mes; pasar a una consulta por rango de fechas
+  /// si se piden muchos meses.
+  Future<List<MonthTotals>> getLastMonthsTotals(
+    String userId, {
+    int months = 6,
+  }) async {
+    final now = DateTime.now();
+    final keys = List.generate(months, (i) {
+      final d = DateTime(now.year, now.month - (months - 1 - i));
+      return '${d.year}-${d.month.toString().padLeft(2, '0')}';
+    });
+    return Future.wait(
+      keys.map((key) async {
+        final expensesFuture = getUserExpenses(userId, month: key);
+        final incomes = await getUserIncomes(userId, month: key);
+        final expenses = await expensesFuture;
+        return MonthTotals(
+          month: key,
+          income: incomes.fold<double>(0, (s, i) => s + i.amount),
+          expense: expenses.fold<double>(0, (s, e) => s + e.amount),
+        );
+      }),
+    );
+  }
+
   /// Obtener últimas transacciones (combinadas)
   Future<List<Map<String, dynamic>>> getRecentTransactions(
     String userId, {
@@ -294,4 +321,17 @@ class TransactionService {
       return [];
     }
   }
+}
+
+/// Totales de un mes. [month] con formato "YYYY-MM".
+class MonthTotals {
+  final String month;
+  final double income;
+  final double expense;
+
+  const MonthTotals({
+    required this.month,
+    required this.income,
+    required this.expense,
+  });
 }

@@ -1,3 +1,6 @@
+import '../../../../core/constants/transaction_categories.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../../core/services/firebase_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -24,27 +27,7 @@ class _AddIncomePageState extends State<AddIncomePage> {
   bool _isLoading = false;
   DateTime _selectedDate = DateTime.now();
 
-  final List<String> _sources = [
-    'Salario',
-    'Freelance',
-    'Negocio',
-    'Inversiones',
-    'Regalo',
-    'Beca',
-    'Padres',
-    'Otros',
-  ];
-
-  final Map<String, IconData> _sourceIcons = {
-    'Salario': Icons.work,
-    'Freelance': Icons.laptop,
-    'Negocio': Icons.business,
-    'Inversiones': Icons.trending_up,
-    'Regalo': Icons.card_giftcard,
-    'Beca': Icons.school,
-    'Padres': Icons.family_restroom,
-    'Otros': Icons.more_horiz,
-  };
+  final List<String> _sources = TransactionCategories.incomeNames;
 
   @override
   void dispose() {
@@ -86,15 +69,12 @@ class _AddIncomePageState extends State<AddIncomePage> {
       );
 
       await _transactionService.createIncome(income);
-
-      // Award points for registering income
-      await _gamificationService.awardPointsForTransaction(
-        user.uid,
-        isExpense: false,
+      unawaited(
+        _gamificationService.onTransactionRegistered(
+          user.uid,
+          isExpense: false,
+        ),
       );
-
-      // Check and unlock achievements
-      await _gamificationService.checkAndUnlockAchievements(user.uid);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -139,7 +119,7 @@ class _AddIncomePageState extends State<AddIncomePage> {
                   gradient: LinearGradient(
                     colors: [
                       AppTheme.secondaryColor,
-                      AppTheme.secondaryColor.withOpacity(0.8),
+                      AppTheme.secondaryColor.withValues(alpha: 0.8),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -237,7 +217,7 @@ class _AddIncomePageState extends State<AddIncomePage> {
                         child: Row(
                           children: [
                             Icon(
-                              _sourceIcons[source] ?? Icons.attach_money,
+                              TransactionCategories.incomeInfo(source).icon,
                               color: AppTheme.secondaryColor,
                             ),
                             const SizedBox(width: 12),
@@ -324,10 +304,10 @@ class _AddIncomePageState extends State<AddIncomePage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.secondaryColor.withOpacity(0.1),
+                  color: AppTheme.secondaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppTheme.secondaryColor.withOpacity(0.3),
+                    color: AppTheme.secondaryColor.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(

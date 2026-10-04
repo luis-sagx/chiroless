@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   static const Color primaryColor = Color.fromARGB(255, 33, 49, 73);
   static const Color secondaryColor = Color(0xFFF5C542); // Dorado elegante
   static const Color accentColor = Color(0xFF3B82F6); // Azul moderno suave
+  static const Color incomeColor = Color(0xFF10B981); // Verde esmeralda
+  static const Color expenseColor = Color(0xFFF43F5E); // Rosa/rojo suave
+  static const Color borderColor = Color(0xFFEEF0F4);
 
   static const Color backgroundColor = Color(0xFFF9FAFB);
   static const Color surfaceColor = Colors.white;
@@ -28,16 +32,15 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
+      fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
 
       colorScheme: const ColorScheme.light(
         primary: primaryColor,
         secondary: secondaryColor,
-        background: backgroundColor,
         surface: surfaceColor,
         error: errorColor,
         onPrimary: textLight,
         onSecondary: Color(0xFF1F2937),
-        onBackground: textPrimary,
         onSurface: textPrimary,
         onError: textLight,
       ),
