@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="widget_bg">#1C1C22</color>
-    <color name="widget_expense_bg">#3A1E26</color>
-    <color name="widget_income_bg">#16332A</color>
+    <color name="widget_text">#F3F4F6</color>
+    <color name="widget_text_secondary">#9CA3AF</color>
+    <color name="widget_border">#34343C</color>
+    <color name="widget_primary">#3B5683</color>
+    <color name="widget_track">#2A2A32</color>
 </resources>

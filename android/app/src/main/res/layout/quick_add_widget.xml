@@ -3,58 +3,94 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:orientation="horizontal"
-    android:padding="6dp">
+    android:orientation="vertical"
+    android:padding="16dp">
 
+    <!-- Resumen del mes: tocarlo abre la app -->
     <LinearLayout
-        android:id="@+id/widget_add_expense"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_marginEnd="3dp"
+        android:id="@+id/widget_summary"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="@drawable/widget_btn_expense"
-        android:gravity="center"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_shortcut_expense" />
+        android:orientation="vertical">
 
         <TextView
+            android:id="@+id/widget_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:text="Gasto"
-            android:textColor="#F43F5E"
-            android:textSize="15sp"
+            android:maxLines="1"
+            android:text="Sagx UP"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/widget_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:text="Registra tu primer gasto"
+            android:textColor="@color/widget_text"
+            android:textSize="16sp"
             android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/widget_progress_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ProgressBar
+                android:id="@+id/widget_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="0dp"
+                android:layout_height="6dp"
+                android:layout_marginEnd="10dp"
+                android:layout_weight="1"
+                android:max="100"
+                android:progressDrawable="@drawable/widget_progress" />
+
+            <TextView
+                android:id="@+id/widget_budget"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout
-        android:id="@+id/widget_add_income"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_marginStart="3dp"
-        android:layout_weight="1"
-        android:background="@drawable/widget_btn_income"
-        android:gravity="center"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginTop="10dp"
         android:orientation="horizontal">
 
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_shortcut_income" />
+        <TextView
+            android:id="@+id/widget_add_expense"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.6"
+            android:background="@drawable/widget_btn_primary"
+            android:gravity="center"
+            android:text="+ Gasto"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
+            android:id="@+id/widget_add_income"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_btn_secondary"
+            android:gravity="center"
             android:text="Ingreso"
-            android:textColor="#10B981"
-            android:textSize="15sp"
+            android:textColor="@color/widget_text"
+            android:textSize="14sp"
             android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>
