@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/services/firebase_service.dart';
+import '../../../../core/constants/transaction_categories.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../models/expense_model.dart';
+import '../../../../shared/widgets/app_card.dart';
 import '../../../transactions/data/transaction_service.dart';
 import '../../../budget/data/budget_service.dart';
 import '../../data/metrics_service.dart';
 import '../../../budget/presentation/pages/add_budget_page.dart';
+import '../widgets/budget_pace_chart.dart';
+import '../widgets/category_donut_chart.dart';
+import '../widgets/monthly_trend_chart.dart';
 
 class StatisticsPage extends StatefulWidget {
   /// Cuando notifica, la página recarga sus datos.
@@ -29,6 +34,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
   double _totalExpense = 0;
   Map<String, dynamic>? _budgetStatus;
   String _period = 'PRE';
+  List<MonthTotals> _monthTotals = [];
+  List<Expense> _monthExpenses = [];
 
   @override
   void initState() {
@@ -44,36 +51,39 @@ class _StatisticsPageState extends State<StatisticsPage> {
   }
 
   Future<void> _loadData() async {
+    final user = _firebaseService.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
     setState(() => _isLoading = true);
 
     try {
-      final user = _firebaseService.currentUser;
-      if (user == null) return;
-
-      // Get current month
       final now = DateTime.now();
       final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
-      // Determine period
-      _period = await _metricsService.determinePeriod(user.uid);
+      final results = await Future.wait<dynamic>([
+        _metricsService.determinePeriod(user.uid),
+        _transactionService.getMonthSummary(user.uid, month: month),
+        _budgetService.getBudgetStatus(user.uid),
+        _transactionService.getLastMonthsTotals(user.uid),
+        _transactionService.getUserExpenses(user.uid, month: month),
+      ]);
+      final summary = results[1] as Map<String, dynamic>;
 
-      // Get monthly summary
-      final summary = await _transactionService.getMonthSummary(
-        user.uid,
-        month: month,
-      );
-      _totalIncome = summary['totalIncomes'] ?? 0.0;
-      _totalExpense = summary['totalExpenses'] ?? 0.0;
-      _expensesByCategory = Map<String, double>.from(
-        summary['expensesByCategory'] ?? {},
-      );
-
-      // Get budget status
-      _budgetStatus = await _budgetService.getBudgetStatus(user.uid);
-
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (!mounted) return;
+      setState(() {
+        _period = results[0] as String;
+        _totalIncome = (summary['totalIncomes'] ?? 0.0).toDouble();
+        _totalExpense = (summary['totalExpenses'] ?? 0.0).toDouble();
+        _expensesByCategory = Map<String, double>.from(
+          summary['expensesByCategory'] ?? {},
+        );
+        _budgetStatus = results[2] as Map<String, dynamic>;
+        _monthTotals = results[3] as List<MonthTotals>;
+        _monthExpenses = results[4] as List<Expense>;
+        _isLoading = false;
+      });
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -224,13 +234,18 @@ class _StatisticsPageState extends State<StatisticsPage> {
             const SizedBox(height: 16),
             if (_budgetStatus != null && _budgetStatus!['hasBudget']) ...[
               _buildBudgetProgress(),
+              BudgetPaceChart(
+                expenses: _monthExpenses,
+                budgetLimit: (_budgetStatus!['totalLimit'] as num).toDouble(),
+              ),
             ] else ...[
               _buildNoBudgetCard(),
             ],
 
             const SizedBox(height: 24),
 
-            if (hasData) _buildBarChart(),
+            if (_monthTotals.any((t) => t.income > 0 || t.expense > 0))
+              MonthlyTrendChart(data: _monthTotals),
 
             const SizedBox(height: 24),
 
@@ -241,7 +256,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 16),
-              _buildPieChart(),
+              CategoryDonutChart(expensesByCategory: _expensesByCategory),
               _buildCategoryList(),
             ],
 
@@ -394,7 +409,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
-              value: percentage / 100,
+              value: (percentage / 100).clamp(0.0, 1.0),
               minHeight: 12,
               backgroundColor: Colors.grey.shade200,
               valueColor: AlwaysStoppedAnimation<Color>(progressColor),
@@ -467,347 +482,79 @@ class _StatisticsPageState extends State<StatisticsPage> {
   Widget _buildCategoryList() {
     final sortedCategories = _expensesByCategory.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-
     final maxAmount = sortedCategories.isNotEmpty
         ? sortedCategories.first.value
         : 1.0;
 
     return Column(
       children: sortedCategories.map((entry) {
-        final category = entry.key;
-        final amount = entry.value;
-        final percentage = (amount / maxAmount) * 100;
-
-        return Container(
+        final info = TransactionCategories.expenseInfo(entry.key);
+        final share = _totalExpense > 0
+            ? entry.value / _totalExpense * 100
+            : 0.0;
+        return AppCard(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Column(
+          child: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    category,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    '\$${amount.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryColor,
-                    ),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: info.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(info.icon, color: info.color, size: 20),
               ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(5),
-                child: LinearProgressIndicator(
-                  value: percentage / 100,
-                  minHeight: 8,
-                  backgroundColor: Colors.grey.shade200,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    AppTheme.primaryColor,
-                  ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          entry.key,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '\$${entry.value.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: LinearProgressIndicator(
+                        value: (entry.value / maxAmount).clamp(0.0, 1.0),
+                        minHeight: 6,
+                        backgroundColor: info.color.withValues(alpha: 0.12),
+                        valueColor: AlwaysStoppedAnimation<Color>(info.color),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${share.toStringAsFixed(0)} % del total',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         );
       }).toList(),
-    );
-  }
-
-  Widget _buildPieChart() {
-    if (_expensesByCategory.isEmpty) return const SizedBox.shrink();
-
-    final List<Color> colors = [
-      Colors.blue,
-      Colors.red,
-      Colors.green,
-      Colors.orange,
-      Colors.purple,
-      Colors.teal,
-      Colors.amber,
-      Colors.indigo,
-    ];
-
-    int colorIndex = 0;
-    final sections = _expensesByCategory.entries.map((entry) {
-      final color = colors[colorIndex % colors.length];
-      colorIndex++;
-
-      return PieChartSectionData(
-        color: color,
-        value: entry.value,
-        title: '${(entry.value / _totalExpense * 100).toStringAsFixed(0)}%',
-        radius: 50,
-        titleStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      );
-    }).toList();
-
-    colorIndex = 0;
-    final indicators = _expensesByCategory.entries.map((entry) {
-      final color = colors[colorIndex % colors.length];
-      colorIndex++;
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Indicator(
-          color: color,
-          text: '${entry.key} (\$${entry.value.toStringAsFixed(0)})',
-          isSquare: true,
-        ),
-      );
-    }).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Distribución de Gastos',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade800,
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 200,
-            child: PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 40,
-                sections: sections,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Wrap(
-            spacing: 16,
-            runSpacing: 4,
-            alignment: WrapAlignment.center,
-            children: indicators,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBarChart() {
-    final maxVal = _totalIncome > _totalExpense ? _totalIncome : _totalExpense;
-    final interval = maxVal > 0 ? maxVal / 5 : 1.0;
-
-    return Container(
-      height: 350,
-      padding: const EdgeInsets.all(24),
-      margin: const EdgeInsets.only(bottom: 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Ingresos vs Gastos',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade800,
-            ),
-          ),
-          const SizedBox(height: 32),
-          Expanded(
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: maxVal * 1.2,
-                barTouchData: BarTouchData(
-                  enabled: true,
-                  touchTooltipData: BarTouchTooltipData(
-                    tooltipBgColor: Colors.blueGrey,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 30,
-                      getTitlesWidget: (value, meta) {
-                        const style = TextStyle(
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        );
-                        String text;
-                        switch (value.toInt()) {
-                          case 0:
-                            text = 'Ingresos';
-                            break;
-                          case 1:
-                            text = 'Gastos';
-                            break;
-                          default:
-                            text = '';
-                        }
-                        return SideTitleWidget(
-                          axisSide: meta.axisSide,
-                          space: 4,
-                          child: Text(text, style: style),
-                        );
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 50,
-                      interval: interval,
-                      getTitlesWidget: (value, meta) {
-                        if (value == 0) return const SizedBox();
-                        return SideTitleWidget(
-                          axisSide: meta.axisSide,
-                          child: Text(
-                            '\$${value >= 1000 ? '${(value / 1000).toStringAsFixed(1)}k' : value.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 10,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  topTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: interval,
-                  getDrawingHorizontalLine: (value) {
-                    return FlLine(
-                      color: Colors.grey.withOpacity(0.1),
-                      strokeWidth: 1,
-                    );
-                  },
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: [
-                  BarChartGroupData(
-                    x: 0,
-                    barRods: [
-                      BarChartRodData(
-                        toY: _totalIncome,
-                        color: AppTheme.secondaryColor,
-                        width: 40,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ],
-                  ),
-                  BarChartGroupData(
-                    x: 1,
-                    barRods: [
-                      BarChartRodData(
-                        toY: _totalExpense,
-                        color: AppTheme.accentColor,
-                        width: 40,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class Indicator extends StatelessWidget {
-  const Indicator({
-    super.key,
-    required this.color,
-    required this.text,
-    required this.isSquare,
-    this.size = 16,
-    this.textColor,
-  });
-  final Color color;
-  final String text;
-  final bool isSquare;
-  final double size;
-  final Color? textColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: isSquare ? BoxShape.rectangle : BoxShape.circle,
-            color: color,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: textColor,
-          ),
-        ),
-      ],
     );
   }
 }
