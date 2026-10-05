@@ -561,11 +561,15 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      'Transacciones recientes',
-                      style: Theme.of(context).textTheme.headlineMedium,
+                    Expanded(
+                      child: Text(
+                        'Transacciones recientes',
+                        style: Theme.of(context).textTheme.headlineMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     TextButton(
                       onPressed: () => setState(() => _selectedIndex = 1),
