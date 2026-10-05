@@ -1,4 +1,4 @@
-# 💰 Control Financiero Universitario SAGX-UP
+# 💰 Chiroless — Control Financiero Universitario
 
 Aplicación móvil multiplataforma para gestionar finanzas personales de estudiantes universitarios mediante IA, gamificación y métricas inteligentes.
 

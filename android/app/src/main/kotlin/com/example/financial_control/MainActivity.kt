@@ -9,7 +9,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         // Puente con el widget: la app escribe el resumen y el widget lo lee.
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "sagx/widget")
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "chiroless/widget")
             .setMethodCallHandler { call, result ->
                 val prefs = getSharedPreferences(QuickAddWidget.PREFS, Context.MODE_PRIVATE)
                 when (call.method) {

@@ -97,13 +97,13 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                 const SizedBox(height: 12),
                 _buildMessageCard(
                   '1:00 PM',
-                  '💰 Recordatorio de Control Financiero',
+                  '💰 Recordatorio de Chiroless',
                   '¡No olvides anotar tus gastos o ingresos del día!',
                 ),
                 const SizedBox(height: 8),
                 _buildMessageCard(
                   '8:00 PM',
-                  '📊 Revisa tu Control Financiero',
+                  '📊 Revisa tu Chiroless',
                   '¿Ya registraste todas tus transacciones de hoy?',
                 ),
               ],

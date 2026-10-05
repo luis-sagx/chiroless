@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
     <application
-        android:label="Sagx UP"
+        android:label="Chiroless"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

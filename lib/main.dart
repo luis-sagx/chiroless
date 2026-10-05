@@ -60,7 +60,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Sagx UP',
+      title: 'Chiroless',
       theme: AppTheme.lightTheme,
       home: const SplashScreen(),
     );

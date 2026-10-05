@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Financial Control</string>
+	<string>Chiroless</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>financial_control</string>
+	<string>Chiroless</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -46,12 +46,12 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Sagx UP usa el micrófono para que dictes tus gastos e ingresos.</string>
+	<string>Chiroless usa el micrófono para que dictes tus gastos e ingresos.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Sagx UP convierte tu voz en texto para registrar transacciones.</string>
+	<string>Chiroless convierte tu voz en texto para registrar transacciones.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Sagx UP lee capturas de comprobantes para registrar transacciones.</string>
+	<string>Chiroless lee capturas de comprobantes para registrar transacciones.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Sagx UP fotografía recibos para registrar transacciones.</string>
+	<string>Chiroless fotografía recibos para registrar transacciones.</string>
 </dict>
 </plist>

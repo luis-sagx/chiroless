@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 /// Puente con el widget Android de pantalla de inicio (MethodChannel nativo).
 /// Nunca lanza: si el widget falla, la app sigue igual.
 class HomeWidgetService {
-  static const _channel = MethodChannel('sagx/widget');
+  static const _channel = MethodChannel('chiroless/widget');
 
   static bool get _supported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;

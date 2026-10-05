@@ -42,7 +42,7 @@ class HelpPage extends StatelessWidget {
 
                   Center(
                     child: Text(
-                      'Cómo usar Sagx UP',
+                      'Cómo usar Chiroless',
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),

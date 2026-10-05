@@ -48,8 +48,8 @@ class NotificationService {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
           'financial_control_channel',
-          'Financial Control Notifications',
-          channelDescription: 'Canal para notificaciones de control financiero',
+          'Notificaciones de Chiroless',
+          channelDescription: 'Canal para notificaciones de Chiroless',
           importance: Importance.max,
           priority: Priority.high,
         );
@@ -73,7 +73,7 @@ class NotificationService {
     // Programar notificación de 1 PM
     await flutterLocalNotificationsPlugin.zonedSchedule(
       1, // ID único para la notificación de 1 PM
-      '💰 Recordatorio de Control Financiero',
+      '💰 Recordatorio de Chiroless',
       '¡No olvides anotar tus gastos o ingresos del día!',
       _nextInstanceOfTime(13, 0), // 1:00 PM
       const NotificationDetails(
@@ -93,7 +93,7 @@ class NotificationService {
     // Programar notificación de 8 PM
     await flutterLocalNotificationsPlugin.zonedSchedule(
       2, // ID único para la notificación de 8 PM
-      '📊 Revisa tu Control Financiero',
+      '📊 Revisa tu Chiroless',
       '¿Ya registraste todas tus transacciones de hoy?',
       _nextInstanceOfTime(20, 0), // 8:00 PM
       const NotificationDetails(

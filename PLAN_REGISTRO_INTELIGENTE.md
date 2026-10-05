@@ -16,7 +16,7 @@
 
 ## 0. Contexto verificado del proyecto
 
-- App Flutter `financial_control` ("Sagx UP"). Firebase Auth + Firestore. Toolchain local: **Flutter 3.44.4 / Dart 3.12.2**.
+- App Flutter `financial_control` ("Chiroless"). Firebase Auth + Firestore. Toolchain local: **Flutter 3.44.4 / Dart 3.12.2**.
 - Estructura: `lib/features/<feature>/data/*_service.dart` (servicios), `lib/features/<feature>/presentation/pages|widgets/*.dart` (UI), modelos en `lib/models/`, compartidos en `lib/core/` y `lib/shared/widgets/`.
 - Navegación imperativa (`Navigator.push` + `MaterialPageRoute`). No hay rutas con nombre.
 - `HomePage` (`lib/features/home/presentation/pages/home_page.dart`) usa un `IndexedStack` con 5 hijos: `_buildHomeContent()`, `const StatisticsPage()`, `Container()`, `const AchievementsPage()` y `_buildProfileContent()`. El índice 2 es el botón "+" de la `BottomNavigationBar`, que llama a `_showAddTransactionOptions()`. Ese método abre `QuickAddSheet` (`lib/features/transactions/presentation/widgets/quick_add_sheet.dart`).
@@ -903,13 +903,13 @@ Versiones verificadas en pub.dev: `speech_to_text` 7.5.0 e `image_picker` 1.2.3.
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
-<string>Sagx UP usa el micrófono para que dictes tus gastos e ingresos.</string>
+<string>Chiroless usa el micrófono para que dictes tus gastos e ingresos.</string>
 <key>NSSpeechRecognitionUsageDescription</key>
-<string>Sagx UP convierte tu voz en texto para registrar transacciones.</string>
+<string>Chiroless convierte tu voz en texto para registrar transacciones.</string>
 <key>NSPhotoLibraryUsageDescription</key>
-<string>Sagx UP lee capturas de comprobantes para registrar transacciones.</string>
+<string>Chiroless lee capturas de comprobantes para registrar transacciones.</string>
 <key>NSCameraUsageDescription</key>
-<string>Sagx UP fotografía recibos para registrar transacciones.</string>
+<string>Chiroless fotografía recibos para registrar transacciones.</string>
 ```
 
 ### Tarea 5.4 — Reescribir `QuickAddSheet`

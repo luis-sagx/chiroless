@@ -103,7 +103,7 @@ class _SplashScreenState extends State<SplashScreen>
                     const SizedBox(height: 24),
                     // Nombre de la App
                     Text(
-                      'Sagx UP',
+                      'Chiroless',
                       style: TextStyle(
                         fontFamily:
                             'Montserrat', // Asegúrate de tener fuentes si quieres algo específico, sino usa la por defecto

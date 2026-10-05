@@ -8,7 +8,7 @@
 
 ## 0. Contexto del proyecto
 
-- App Flutter (`financial_control`, mostrada como "Sagx UP") de control de gastos personales con Firebase (Auth + Firestore).
+- App Flutter (`financial_control`, mostrada como "Chiroless") de control de gastos personales con Firebase (Auth + Firestore).
 - Estructura: `lib/features/<feature>/data/*_service.dart` (servicios) y `lib/features/<feature>/presentation/pages/*.dart` (UI). Modelos en `lib/models/`.
 - Colecciones Firestore: `users`, `expenses`, `incomes`, `budgets`, `achievements`.
 - Los documentos de `expenses` e `incomes` tienen campo `month` con formato `"YYYY-MM"` (ej. `"2026-07"`). **Importante:** `TransactionService.getUserExpenses(userId)` y `getUserIncomes(userId)` SIN parámetro `month` devuelven SOLO el mes actual (filtran por `month`), no todo el historial.

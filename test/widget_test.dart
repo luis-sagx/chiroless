@@ -7,7 +7,7 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pump();
 
-    expect(find.text('Sagx UP'), findsOneWidget);
+    expect(find.text('Chiroless'), findsOneWidget);
     expect(
       find.text('Eleva tus finanzas al siguiente nivel'),
       findsOneWidget,

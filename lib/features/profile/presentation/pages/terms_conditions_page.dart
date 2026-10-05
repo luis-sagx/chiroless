@@ -59,19 +59,19 @@ class TermsConditionsPage extends StatelessWidget {
             _buildSection(
               context,
               '1. Aceptación de los Términos',
-              'Al acceder y utilizar Sagx UP, aceptas estar sujeto a estos términos y condiciones. Si no estás de acuerdo con alguna parte de estos términos, no debes utilizar nuestra aplicación.',
+              'Al acceder y utilizar Chiroless, aceptas estar sujeto a estos términos y condiciones. Si no estás de acuerdo con alguna parte de estos términos, no debes utilizar nuestra aplicación.',
             ),
             const SizedBox(height: 20),
             _buildSection(
               context,
               '2. Uso de la Aplicación',
-              'Sagx UP es una herramienta de gestión financiera personal. Te comprometes a utilizar la aplicación solo para fines legales y de acuerdo con estos términos. No debes usar la aplicación de ninguna manera que pueda dañar, deshabilitar o perjudicar la aplicación o interferir con el uso de otros usuarios.',
+              'Chiroless es una herramienta de gestión financiera personal. Te comprometes a utilizar la aplicación solo para fines legales y de acuerdo con estos términos. No debes usar la aplicación de ninguna manera que pueda dañar, deshabilitar o perjudicar la aplicación o interferir con el uso de otros usuarios.',
             ),
             const SizedBox(height: 20),
             _buildSection(
               context,
               '3. Privacidad y Protección de Datos',
-              'Tu privacidad es importante para nosotros. Toda la información financiera que ingreses en Sagx UP es almacenada de forma segura en Firebase. No compartimos tus datos personales con terceros sin tu consentimiento explícito.',
+              'Tu privacidad es importante para nosotros. Toda la información financiera que ingreses en Chiroless es almacenada de forma segura en Firebase. No compartimos tus datos personales con terceros sin tu consentimiento explícito.',
             ),
             const SizedBox(height: 20),
             _buildSection(
@@ -89,19 +89,19 @@ class TermsConditionsPage extends StatelessWidget {
             _buildSection(
               context,
               '6. Información Financiera',
-              'Sagx UP proporciona herramientas para el seguimiento y análisis de tus finanzas personales. La información y recomendaciones proporcionadas por la aplicación son solo para fines informativos y educativos. No constituyen asesoramiento financiero profesional.',
+              'Chiroless proporciona herramientas para el seguimiento y análisis de tus finanzas personales. La información y recomendaciones proporcionadas por la aplicación son solo para fines informativos y educativos. No constituyen asesoramiento financiero profesional.',
             ),
             const SizedBox(height: 20),
             _buildSection(
               context,
               '7. Propiedad Intelectual',
-              'Todo el contenido, diseño, gráficos, interfaces y código de Sagx UP son propiedad exclusiva de sus desarrolladores y están protegidos por las leyes de derechos de autor. No puedes copiar, modificar, distribuir o reproducir ningún contenido sin autorización previa por escrito.',
+              'Todo el contenido, diseño, gráficos, interfaces y código de Chiroless son propiedad exclusiva de sus desarrolladores y están protegidos por las leyes de derechos de autor. No puedes copiar, modificar, distribuir o reproducir ningún contenido sin autorización previa por escrito.',
             ),
             const SizedBox(height: 20),
             _buildSection(
               context,
               '8. Limitación de Responsabilidad',
-              'Sagx UP se proporciona "tal cual" sin garantías de ningún tipo. No garantizamos que la aplicación será ininterrumpida o libre de errores. No seremos responsables de ningún daño directo, indirecto, incidental o consecuente que resulte del uso o la incapacidad de usar la aplicación.',
+              'Chiroless se proporciona "tal cual" sin garantías de ningún tipo. No garantizamos que la aplicación será ininterrumpida o libre de errores. No seremos responsables de ningún daño directo, indirecto, incidental o consecuente que resulte del uso o la incapacidad de usar la aplicación.',
             ),
             const SizedBox(height: 20),
             _buildSection(

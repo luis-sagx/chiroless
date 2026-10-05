@@ -34,7 +34,7 @@ class AboutPage extends StatelessWidget {
             const SizedBox(height: 24),
 
             const Text(
-              'Sagx UP',
+              'Chiroless',
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),

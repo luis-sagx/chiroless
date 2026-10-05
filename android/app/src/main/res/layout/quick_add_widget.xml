@@ -19,7 +19,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:maxLines="1"
-            android:text="Sagx UP"
+            android:text="Chiroless"
             android:textColor="@color/widget_text_secondary"
             android:textSize="13sp" />
 

@@ -18,7 +18,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     {
       'title': '¡Bienvenido!',
       'body':
-          'Gracias por unirte a Sagx UP. Comienza registrando tu primer gasto.',
+          'Gracias por unirte a Chiroless. Comienza registrando tu primer gasto.',
       'date': DateTime.now().subtract(const Duration(days: 2)),
       'read': true,
       'icon': Icons.waving_hand,
