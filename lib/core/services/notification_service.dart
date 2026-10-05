@@ -50,6 +50,7 @@ class NotificationService {
           'financial_control_channel',
           'Notificaciones de Chiroless',
           channelDescription: 'Canal para notificaciones de Chiroless',
+          icon: 'ic_stat_chiroless',
           importance: Importance.max,
           priority: Priority.high,
         );
@@ -81,6 +82,7 @@ class NotificationService {
           'daily_reminder_channel',
           'Recordatorios Diarios',
           channelDescription: 'Recordatorios para registrar tus transacciones',
+          icon: 'ic_stat_chiroless',
           importance: Importance.high,
           priority: Priority.high,
           playSound: true,
@@ -101,6 +103,7 @@ class NotificationService {
           'daily_reminder_channel',
           'Recordatorios Diarios',
           channelDescription: 'Recordatorios para registrar tus transacciones',
+          icon: 'ic_stat_chiroless',
           importance: Importance.high,
           priority: Priority.high,
           playSound: true,
