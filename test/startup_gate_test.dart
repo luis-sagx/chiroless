@@ -1,9 +1,18 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:financial_control/features/home/presentation/pages/splash_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('Firebase startup treats a null auth state as signed out', () async {
+    final gate = StartupGate.firebase(
+      authStateChanges: () => Stream<User?>.value(null),
+    );
+
+    expect(await gate.hasSession(), isFalse);
+  });
+
   test('signed-in startup skips local welcome storage', () async {
     final gate = StartupGate(
       hasSession: () async => true,
@@ -64,13 +73,16 @@ void main() {
     expect(await route, StartupRoute.home);
   });
 
-  test('authentication error opens login instead of leaving splash stuck', () async {
-    final gate = StartupGate(
-      hasSession: () => Future<bool>.error(StateError('Auth unavailable')),
-      hasSeenWelcome: () async => true,
-      markWelcomeSeen: () async {},
-    );
+  test(
+    'authentication error opens login instead of leaving splash stuck',
+    () async {
+      final gate = StartupGate(
+        hasSession: () => Future<bool>.error(StateError('Auth unavailable')),
+        hasSeenWelcome: () async => true,
+        markWelcomeSeen: () async {},
+      );
 
-    expect(await gate.resolve(), StartupRoute.login);
-  });
+      expect(await gate.resolve(), StartupRoute.login);
+    },
+  );
 }

@@ -24,18 +24,22 @@ class StartupGate {
   final Future<void> Function() markWelcomeSeen;
   final Duration welcomeDuration;
 
-  factory StartupGate.firebase() => StartupGate(
-    hasSession: () async =>
-        FirebaseAuth.instance.authStateChanges().first != null,
-    hasSeenWelcome: () async {
-      final preferences = await SharedPreferences.getInstance();
-      return preferences.getBool(welcomeKey) ?? false;
-    },
-    markWelcomeSeen: () async {
-      final preferences = await SharedPreferences.getInstance();
-      await preferences.setBool(welcomeKey, true);
-    },
-  );
+  factory StartupGate.firebase({Stream<User?> Function()? authStateChanges}) =>
+      StartupGate(
+        hasSession: () async =>
+            await (authStateChanges ?? FirebaseAuth.instance.authStateChanges)
+                .call()
+                .first !=
+            null,
+        hasSeenWelcome: () async {
+          final preferences = await SharedPreferences.getInstance();
+          return preferences.getBool(welcomeKey) ?? false;
+        },
+        markWelcomeSeen: () async {
+          final preferences = await SharedPreferences.getInstance();
+          await preferences.setBool(welcomeKey, true);
+        },
+      );
 
   Future<StartupRoute> resolve() async {
     bool signedIn;
