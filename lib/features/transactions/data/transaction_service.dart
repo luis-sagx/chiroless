@@ -268,27 +268,55 @@ class TransactionService {
 
   /// Totales de los últimos [months] meses (incluye el actual), del más
   /// antiguo al más reciente.
-  /// ponytail: 2 consultas por mes; pasar a una consulta por rango de fechas
-  /// si se piden muchos meses.
+  /// Reutiliza totales ya cargados y consulta solo meses faltantes. Los errores
+  /// de lectura se propagan para evitar mostrar un cero como dato real.
   Future<List<MonthTotals>> getLastMonthsTotals(
     String userId, {
     int months = 6,
+    Map<String, MonthTotals> knownTotals = const {},
   }) async {
-    final now = DateTime.now();
-    final keys = List.generate(months, (i) {
-      final d = DateTime(now.year, now.month - (months - 1 - i));
-      return '${d.year}-${d.month.toString().padLeft(2, '0')}';
-    });
-    return Future.wait(
-      keys.map((key) async {
-        final expensesFuture = getUserExpenses(userId, month: key);
-        final incomes = await getUserIncomes(userId, month: key);
+    return loadLastMonthsTotals(
+      now: DateTime.now(),
+      months: months,
+      knownTotals: knownTotals,
+      fetch: (key) async {
+        final expensesFuture = getUserExpenses(
+          userId,
+          month: key,
+          rethrowOnError: true,
+        );
+        final incomes = await getUserIncomes(
+          userId,
+          month: key,
+          rethrowOnError: true,
+        );
         final expenses = await expensesFuture;
         return MonthTotals(
           month: key,
           income: incomes.fold<double>(0, (s, i) => s + i.amount),
           expense: expenses.fold<double>(0, (s, e) => s + e.amount),
         );
+      },
+    );
+  }
+
+  /// Compone un rango acotado en orden cronológico sin volver a pedir meses
+  /// conocidos. [fetch] debe propagar errores de lectura.
+  static Future<List<MonthTotals>> loadLastMonthsTotals({
+    required DateTime now,
+    required int months,
+    required Map<String, MonthTotals> knownTotals,
+    required Future<MonthTotals> Function(String month) fetch,
+  }) async {
+    final keys = List.generate(months, (i) {
+      final d = DateTime(now.year, now.month - (months - 1 - i));
+      return '${d.year}-${d.month.toString().padLeft(2, '0')}';
+    });
+    return Future.wait(
+      keys.map((key) async {
+        final cached = knownTotals[key];
+        if (cached != null) return cached;
+        return fetch(key);
       }),
     );
   }

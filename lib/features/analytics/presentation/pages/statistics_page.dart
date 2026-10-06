@@ -3,6 +3,7 @@ import '../../../../core/services/firebase_service.dart';
 import '../../../../core/constants/transaction_categories.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../models/expense_model.dart';
+import '../../../../models/income_model.dart';
 import '../../../../models/budget_model.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../transactions/data/transaction_service.dart';
@@ -28,6 +29,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
   final _budgetService = BudgetService();
 
   bool _isLoading = true;
+  bool _trendLoading = false;
+  String? _loadError;
+  String? _trendError;
   Map<String, double> _expensesByCategory = {};
   double _totalIncome = 0;
   double _totalExpense = 0;
@@ -36,6 +40,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
   int _trendRequest = 0;
   List<MonthTotals> _monthTotals = [];
   List<Expense> _monthExpenses = [];
+  final Map<String, MonthTotals> _cachedTotals = {};
 
   @override
   void initState() {
@@ -57,37 +62,98 @@ class _StatisticsPageState extends State<StatisticsPage> {
       if (mounted) setState(() => _isLoading = false);
       return;
     }
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _trendLoading = false;
+      _loadError = null;
+      _trendError = null;
+      _monthTotals = [];
+      _cachedTotals.clear();
+    });
 
     try {
       final now = DateTime.now();
       final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
-      final results = await Future.wait<dynamic>([
-        _transactionService.getMonthSummary(user.uid, month: month),
-        _budgetService.getBudgetStatus(user.uid),
-        _transactionService.getLastMonthsTotals(user.uid, months: _trendMonths),
-        _transactionService.getUserExpenses(user.uid, month: month),
+      final current = await Future.wait<dynamic>([
+        _transactionService.getUserExpenses(
+          user.uid,
+          month: month,
+          rethrowOnError: true,
+        ),
+        _transactionService.getUserIncomes(
+          user.uid,
+          month: month,
+          rethrowOnError: true,
+        ),
+        _budgetService.getCurrentBudget(user.uid, rethrowOnError: true),
       ]);
-      final summary = results[0] as Map<String, dynamic>;
-
-      if (!mounted) return;
-      setState(() {
-        _totalIncome = (summary['totalIncomes'] ?? 0.0).toDouble();
-        _totalExpense = (summary['totalExpenses'] ?? 0.0).toDouble();
-        _expensesByCategory = Map<String, double>.from(
-          summary['expensesByCategory'] ?? {},
+      final expenses = current[0] as List<Expense>;
+      final incomes = current[1] as List<Income>;
+      final budget = current[2] as Budget?;
+      final totalExpense = expenses.fold<double>(
+        0,
+        (sum, expense) => sum + expense.amount,
+      );
+      final totalIncome = incomes.fold<double>(
+        0,
+        (sum, income) => sum + income.amount,
+      );
+      final categories = <String, double>{};
+      for (final expense in expenses) {
+        categories.update(
+          expense.category,
+          (total) => total + expense.amount,
+          ifAbsent: () => expense.amount,
         );
-        _budgetStatus = results[1] as Map<String, dynamic>;
-        if (trendRequest == _trendRequest) {
-          _monthTotals = results[2] as List<MonthTotals>;
-        }
-        _monthExpenses = results[3] as List<Expense>;
+      }
+      final currentTotals = MonthTotals(
+        month: month,
+        income: totalIncome,
+        expense: totalExpense,
+      );
+      if (!mounted || trendRequest != _trendRequest) return;
+      setState(() {
+        _totalIncome = totalIncome;
+        _totalExpense = totalExpense;
+        _expensesByCategory = categories;
+        _budgetStatus = BudgetService.calculateBudgetStatus(
+          budget,
+          expenses,
+          month,
+        );
+        _cachedTotals[month] = currentTotals;
+        _monthExpenses = expenses;
         _isLoading = false;
+        _trendLoading = true;
       });
+      try {
+        final totals = await _transactionService.getLastMonthsTotals(
+          user.uid,
+          months: _trendMonths,
+          knownTotals: Map.of(_cachedTotals),
+        );
+        if (!mounted || trendRequest != _trendRequest) return;
+        setState(() {
+          _monthTotals = totals;
+          _cachedTotals.addEntries(
+            totals.map((total) => MapEntry(total.month, total)),
+          );
+          _trendLoading = false;
+        });
+      } catch (e) {
+        if (!mounted || trendRequest != _trendRequest) return;
+        setState(() {
+          _trendLoading = false;
+          _trendError = 'No se pudo cargar la tendencia';
+        });
+      }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      if (mounted && trendRequest == _trendRequest) {
+        setState(() {
+          _isLoading = false;
+          _loadError = 'No se pudieron cargar las estadísticas';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
@@ -101,18 +167,34 @@ class _StatisticsPageState extends State<StatisticsPage> {
     if (user == null) return;
     final previousMonths = _trendMonths;
     final request = ++_trendRequest;
-    setState(() => _trendMonths = months);
+    setState(() {
+      _trendMonths = months;
+      _trendLoading = true;
+      _trendError = null;
+    });
     try {
       final totals = await _transactionService.getLastMonthsTotals(
         user.uid,
         months: months,
+        knownTotals: Map.of(_cachedTotals),
       );
       if (mounted && request == _trendRequest) {
-        setState(() => _monthTotals = totals);
+        setState(() {
+          _monthTotals = totals;
+          _cachedTotals.addEntries(
+            totals.map((total) => MapEntry(total.month, total)),
+          );
+          _trendLoading = false;
+          _trendError = null;
+        });
       }
     } catch (_) {
       if (mounted && request == _trendRequest) {
-        setState(() => _trendMonths = previousMonths);
+        setState(() {
+          _trendMonths = previousMonths;
+          _trendLoading = false;
+          _trendError = 'No se pudo cargar la tendencia';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No se pudo cargar la tendencia')),
         );
@@ -120,10 +202,52 @@ class _StatisticsPageState extends State<StatisticsPage> {
     }
   }
 
+  Future<void> _retryTrend() async {
+    final user = _firebaseService.currentUser;
+    if (user == null) return;
+    final request = ++_trendRequest;
+    setState(() {
+      _trendLoading = true;
+      _trendError = null;
+    });
+    try {
+      final totals = await _transactionService.getLastMonthsTotals(
+        user.uid,
+        months: _trendMonths,
+        knownTotals: Map.of(_cachedTotals),
+      );
+      if (!mounted || request != _trendRequest) return;
+      setState(() {
+        _monthTotals = totals;
+        _cachedTotals.addEntries(
+          totals.map((total) => MapEntry(total.month, total)),
+        );
+        _trendLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || request != _trendRequest) return;
+      setState(() {
+        _trendLoading = false;
+        _trendError = 'No se pudo cargar la tendencia';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+    if (_loadError != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_loadError!),
+            TextButton(onPressed: _loadData, child: const Text('Reintentar')),
+          ],
+        ),
+      );
     }
 
     final hasData = _expensesByCategory.isNotEmpty || _totalIncome > 0;
@@ -237,11 +361,24 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
             const SizedBox(height: 24),
 
-            MonthlyTrendChart(
-              data: _monthTotals,
-              months: _trendMonths,
-              onMonthsChanged: _changeTrendMonths,
-            ),
+            if (_monthTotals.isNotEmpty ||
+                (!_trendLoading && _trendError == null))
+              MonthlyTrendChart(
+                data: _monthTotals,
+                months: _trendMonths,
+                onMonthsChanged: _changeTrendMonths,
+              ),
+            if (_trendLoading) const LinearProgressIndicator(),
+            if (_trendError != null)
+              Row(
+                children: [
+                  Expanded(child: Text(_trendError!)),
+                  TextButton(
+                    onPressed: _retryTrend,
+                    child: const Text('Reintentar'),
+                  ),
+                ],
+              ),
 
             const SizedBox(height: 24),
 
