@@ -9,7 +9,9 @@ import '../../data/transaction_service.dart';
 import '../../../achievements/data/gamification_service.dart';
 
 class AddIncomePage extends StatefulWidget {
-  const AddIncomePage({Key? key}) : super(key: key);
+  final Income? income;
+
+  const AddIncomePage({Key? key, this.income}) : super(key: key);
 
   @override
   State<AddIncomePage> createState() => _AddIncomePageState();
@@ -28,6 +30,19 @@ class _AddIncomePageState extends State<AddIncomePage> {
   DateTime _selectedDate = DateTime.now();
 
   final List<String> _sources = TransactionCategories.incomeNames;
+
+  @override
+  void initState() {
+    super.initState();
+    final income = widget.income;
+    if (income == null) return;
+    _amountController.text = income.amount.toStringAsFixed(2);
+    _descriptionController.text = income.description ?? '';
+    _selectedSource = _sources.contains(income.source)
+        ? income.source
+        : TransactionCategories.income.last.name;
+    _selectedDate = income.date;
+  }
 
   @override
   void dispose() {
@@ -60,7 +75,7 @@ class _AddIncomePageState extends State<AddIncomePage> {
       if (user == null) throw Exception('Usuario no autenticado');
 
       final income = Income(
-        id: null,
+        id: widget.income?.id,
         userId: user.uid,
         amount: double.parse(_amountController.text),
         source: _selectedSource,
@@ -68,18 +83,27 @@ class _AddIncomePageState extends State<AddIncomePage> {
         date: _selectedDate,
       );
 
-      await _transactionService.createIncome(income);
-      unawaited(
-        _gamificationService.onTransactionRegistered(
-          user.uid,
-          isExpense: false,
-        ),
-      );
+      final saved = widget.income == null
+          ? await _transactionService.createIncome(income) != null
+          : await _transactionService.updateIncome(income);
+      if (!saved) throw Exception('No se pudo guardar el ingreso');
+      if (widget.income == null) {
+        unawaited(
+          _gamificationService.onTransactionRegistered(
+            user.uid,
+            isExpense: false,
+          ),
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ingreso registrado exitosamente'),
+          SnackBar(
+            content: Text(
+              widget.income == null
+                  ? 'Ingreso registrado'
+                  : 'Ingreso actualizado',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -104,7 +128,12 @@ class _AddIncomePageState extends State<AddIncomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Agregar Ingreso'), elevation: 0),
+      appBar: AppBar(
+        title: Text(
+          widget.income == null ? 'Agregar Ingreso' : 'Editar Ingreso',
+        ),
+        elevation: 0,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -175,7 +204,9 @@ class _AddIncomePageState extends State<AddIncomePage> {
                                 return 'Ingresa el monto';
                               }
                               final amount = double.tryParse(value);
-                              if (amount == null || amount <= 0) {
+                              if (amount == null ||
+                                  !amount.isFinite ||
+                                  amount <= 0) {
                                 return 'Monto inválido';
                               }
                               return null;

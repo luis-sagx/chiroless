@@ -14,6 +14,7 @@ import '../../../auth/data/user_service.dart';
 import '../../../../models/user_model.dart';
 import '../../../transactions/presentation/pages/add_expense_page.dart';
 import '../../../transactions/presentation/pages/add_income_page.dart';
+import '../../../transactions/presentation/pages/transactions_page.dart';
 import '../../../analytics/presentation/pages/statistics_page.dart';
 import '../../../achievements/presentation/pages/achievements_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
@@ -202,6 +203,16 @@ class _HomePageState extends State<HomePage> {
       _loadUser(); // Reload to update balance
       _dataVersion.value++;
     }
+  }
+
+  Future<void> _navigateToTransactions() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TransactionsPage()),
+    );
+    if (!mounted) return;
+    _loadTransactionData();
+    _dataVersion.value++;
   }
 
   Future<void> _navigateToEditProfile() async {
@@ -572,7 +583,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => setState(() => _selectedIndex = 1),
+                      onPressed: _navigateToTransactions,
                       child: const Text('Ver todo'),
                     ),
                   ],

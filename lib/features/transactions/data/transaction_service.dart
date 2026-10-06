@@ -19,7 +19,11 @@ class TransactionService {
   }
 
   /// Obtener gastos del mes actual del usuario
-  Future<List<Expense>> getUserExpenses(String userId, {String? month}) async {
+  Future<List<Expense>> getUserExpenses(
+    String userId, {
+    String? month,
+    bool rethrowOnError = false,
+  }) async {
     try {
       final targetMonth =
           month ??
@@ -37,6 +41,7 @@ class TransactionService {
           .toList();
     } catch (e) {
       print('Error obteniendo gastos: $e');
+      if (rethrowOnError) rethrow;
       return [];
     }
   }
@@ -119,7 +124,11 @@ class TransactionService {
   }
 
   /// Obtener ingresos del mes actual del usuario
-  Future<List<Income>> getUserIncomes(String userId, {String? month}) async {
+  Future<List<Income>> getUserIncomes(
+    String userId, {
+    String? month,
+    bool rethrowOnError = false,
+  }) async {
     try {
       final targetMonth =
           month ??
@@ -137,6 +146,7 @@ class TransactionService {
           .toList();
     } catch (e) {
       print('Error obteniendo ingresos: $e');
+      if (rethrowOnError) rethrow;
       return [];
     }
   }

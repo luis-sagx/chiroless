@@ -42,16 +42,26 @@ void main() {
       expect(e.month, '2026-03');
       expect(e.isImpulsive, isFalse);
     });
+
+    test('mover un gasto a otro mes actualiza la clave mensual', () {
+      final original = Expense(
+        id: 'e',
+        userId: 'u',
+        amount: 10,
+        category: 'Ropa',
+        date: date,
+        description: '',
+      );
+      final moved = original.copyWith(date: DateTime(2026, 4, 1));
+      expect(moved.toMap()['month'], '2026-04');
+    });
   });
 
   group('Income', () {
     test('roundtrip, description opcional y copyWith', () {
       final i = Income(userId: 'u', amount: 100, source: 'Salario', date: date);
       expect(i.toMap().containsKey('description'), isFalse);
-      final back = Income.fromMap(
-        i.copyWith(description: 'd').toMap(),
-        'id',
-      );
+      final back = Income.fromMap(i.copyWith(description: 'd').toMap(), 'id');
       expect(back.description, 'd');
       expect(back.month, '2026-03');
       expect(back.source, 'Salario');
@@ -61,6 +71,18 @@ void main() {
       final i = Income.fromMap({'date': Timestamp.fromDate(date)}, 'i');
       expect(i.source, '');
       expect(i.amount, 0.0);
+    });
+
+    test('mover un ingreso a otro mes actualiza la clave mensual', () {
+      final original = Income(
+        id: 'i',
+        userId: 'u',
+        amount: 100,
+        source: 'Salario',
+        date: date,
+      );
+      final moved = original.copyWith(date: DateTime(2026, 4, 1));
+      expect(moved.toMap()['month'], '2026-04');
     });
   });
 
@@ -227,9 +249,16 @@ void main() {
   group('AuthExceptionHandler', () {
     test('mapea códigos conocidos y desconocidos', () {
       const codes = [
-        'invalid-email', 'user-disabled', 'user-not-found', 'wrong-password',
-        'email-already-in-use', 'operation-not-allowed', 'weak-password',
-        'invalid-credential', 'too-many-requests', 'network-request-failed',
+        'invalid-email',
+        'user-disabled',
+        'user-not-found',
+        'wrong-password',
+        'email-already-in-use',
+        'operation-not-allowed',
+        'weak-password',
+        'invalid-credential',
+        'too-many-requests',
+        'network-request-failed',
         'requires-recent-login',
       ];
       for (final c in codes) {

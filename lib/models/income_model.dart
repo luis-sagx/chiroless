@@ -60,7 +60,7 @@ class Income {
       amount: amount ?? this.amount,
       source: source ?? this.source,
       date: date ?? this.date,
-      month: month ?? this.month,
+      month: month ?? (date == null ? this.month : null),
       description: description ?? this.description,
     );
   }
