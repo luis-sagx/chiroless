@@ -3,6 +3,7 @@ import '../../../../core/services/firebase_service.dart';
 import '../../../../core/constants/transaction_categories.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../models/expense_model.dart';
+import '../../../../models/budget_model.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../transactions/data/transaction_service.dart';
 import '../../../budget/data/budget_service.dart';
@@ -166,10 +167,29 @@ class _StatisticsPageState extends State<StatisticsPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Presupuesto',
-                  style: Theme.of(context).textTheme.headlineMedium,
+                Expanded(
+                  child: Text(
+                    'Presupuesto de $currentMonth',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
                 ),
+                if (_budgetStatus?['hasBudget'] == true)
+                  TextButton.icon(
+                    onPressed: () async {
+                      final budget = _budgetStatus?['budget'] as Budget?;
+                      if (budget == null) return;
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              AddBudgetPage(existingBudget: budget),
+                        ),
+                      );
+                      if (result == true && mounted) _loadData();
+                    },
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Editar'),
+                  ),
                 if (_budgetStatus == null || !_budgetStatus!['hasBudget'])
                   TextButton.icon(
                     onPressed: () async {
@@ -190,6 +210,11 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     ),
                   ),
               ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Límite de gastos para este mes',
+              style: TextStyle(color: AppTheme.textSecondary),
             ),
             const SizedBox(height: 16),
             if (_budgetStatus != null && _budgetStatus!['hasBudget']) ...[

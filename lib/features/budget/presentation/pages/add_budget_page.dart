@@ -67,14 +67,13 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
       final month =
           '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
 
-      final budget = Budget(
-        id: widget.existingBudget?.id,
-        userId: user.uid,
-        monthlyLimit: double.parse(_amountController.text),
-        month: month,
-      );
+      final limit = double.parse(_amountController.text);
+      final budget =
+          widget.existingBudget?.copyWith(monthlyLimit: limit) ??
+          Budget(userId: user.uid, monthlyLimit: limit, month: month);
 
-      await _budgetService.setBudget(budget);
+      final savedId = await _budgetService.setBudget(budget);
+      if (savedId == null) throw Exception('No se pudo guardar el presupuesto');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -136,7 +135,7 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Define un límite mensual de gastos para controlar tus finanzas',
+                        'Este límite de gastos se aplica al mes seleccionado.',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppTheme.primaryColor,
@@ -152,7 +151,9 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
               Text('Mes', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               InkWell(
-                onTap: () => _selectMonth(context),
+                onTap: widget.existingBudget == null
+                    ? () => _selectMonth(context)
+                    : null,
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -180,7 +181,11 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                           ),
                         ],
                       ),
-                      Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
+                      if (widget.existingBudget == null)
+                        Icon(
+                          Icons.arrow_drop_down,
+                          color: Colors.grey.shade600,
+                        ),
                     ],
                   ),
                 ),
