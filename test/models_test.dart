@@ -87,6 +87,39 @@ void main() {
   });
 
   group('Budget', () {
+    test('usa el último cambio anterior o igual al mes consultado', () {
+      final january = Budget(userId: 'u', monthlyLimit: 500, month: '2026-01');
+      final march = Budget(userId: 'u', monthlyLimit: 700, month: '2026-03');
+      final future = Budget(userId: 'u', monthlyLimit: 900, month: '2026-11');
+      final changes = [future, january, march];
+      expect(Budget.latestForMonth(changes, '2025-12'), isNull);
+      expect(Budget.latestForMonth(changes, '2026-02'), same(january));
+      expect(Budget.latestForMonth(changes, '2026-03'), same(march));
+      expect(Budget.latestForMonth(changes, '2026-09'), same(march));
+      expect(Budget.latestForMonth(changes, '2026-11'), same(future));
+    });
+
+    test(
+      'un límite heredado crea una nueva configuración desde el mes editado',
+      () {
+        final original = Budget(
+          id: 'original',
+          userId: 'u',
+          monthlyLimit: 500,
+          month: '2026-03',
+          categoryLimits: {'Comida': 100},
+        );
+        final override = original.overrideFrom('2026-06', monthlyLimit: 600);
+        expect(original.month, '2026-03');
+        expect(original.monthlyLimit, 500);
+        expect(override.id, isNull);
+        expect(override.month, '2026-06');
+        expect(override.monthlyLimit, 600);
+        expect(override.categoryLimits, {'Comida': 100});
+        expect(override.toMap()['month'], '2026-06');
+      },
+    );
+
     test('roundtrip con y sin categoryLimits', () {
       final b = Budget(userId: 'u', monthlyLimit: 500, month: '2026-03');
       expect(b.toMap().containsKey('categoryLimits'), isFalse);

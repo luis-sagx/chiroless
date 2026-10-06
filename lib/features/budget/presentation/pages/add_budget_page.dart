@@ -6,8 +6,10 @@ import '../../data/budget_service.dart';
 
 class AddBudgetPage extends StatefulWidget {
   final Budget? existingBudget;
+  final bool isInherited;
 
-  const AddBudgetPage({Key? key, this.existingBudget}) : super(key: key);
+  const AddBudgetPage({Key? key, this.existingBudget, this.isInherited = false})
+    : super(key: key);
 
   @override
   State<AddBudgetPage> createState() => _AddBudgetPageState();
@@ -29,7 +31,9 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
       _amountController.text = widget.existingBudget!.monthlyLimit.toString();
       // Parse month from "2026-01" format
       final parts = widget.existingBudget!.month.split('-');
-      _selectedMonth = DateTime(int.parse(parts[0]), int.parse(parts[1]));
+      if (!widget.isInherited) {
+        _selectedMonth = DateTime(int.parse(parts[0]), int.parse(parts[1]));
+      }
     }
   }
 
@@ -68,9 +72,10 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
           '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
 
       final limit = double.parse(_amountController.text);
-      final budget =
-          widget.existingBudget?.copyWith(monthlyLimit: limit) ??
-          Budget(userId: user.uid, monthlyLimit: limit, month: month);
+      final budget = widget.isInherited
+          ? widget.existingBudget!.overrideFrom(month, monthlyLimit: limit)
+          : widget.existingBudget?.copyWith(monthlyLimit: limit) ??
+                Budget(userId: user.uid, monthlyLimit: limit, month: month);
 
       final savedId = await _budgetService.setBudget(budget);
       if (savedId == null) throw Exception('No se pudo guardar el presupuesto');
@@ -135,7 +140,7 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Este límite de gastos se aplica al mes seleccionado.',
+                        'Este límite mensual se repetirá automáticamente en los próximos meses hasta que lo cambies.',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppTheme.primaryColor,

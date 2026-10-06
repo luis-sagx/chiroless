@@ -35,41 +35,29 @@ class BudgetService {
     }
   }
 
-  /// Obtener presupuesto del mes actual
-  Future<Budget?> getCurrentBudget(String userId) async {
-    try {
-      final month =
-          '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
-
-      final snapshot = await _db
-          .collection('budgets')
-          .where('userId', isEqualTo: userId)
-          .where('month', isEqualTo: month)
-          .limit(1)
-          .get();
-
-      if (snapshot.docs.isEmpty) return null;
-
-      return Budget.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
-    } catch (e) {
-      print('Error obteniendo presupuesto: $e');
-      return null;
-    }
+  static String get currentMonth {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}';
   }
 
-  /// Obtener presupuesto de un mes específico
+  /// Obtener el último límite configurado hasta el mes actual.
+  Future<Budget?> getCurrentBudget(String userId) async {
+    return getBudgetByMonth(userId, currentMonth);
+  }
+
+  /// Devuelve el último límite vigente sin crear documentos mensuales.
   Future<Budget?> getBudgetByMonth(String userId, String month) async {
     try {
+      // Un usuario normalmente tiene pocos cambios de límite; esta consulta
+      // de igualdad usa el índice de campo simple de Firestore.
       final snapshot = await _db
           .collection('budgets')
           .where('userId', isEqualTo: userId)
-          .where('month', isEqualTo: month)
-          .limit(1)
           .get();
-
-      if (snapshot.docs.isEmpty) return null;
-
-      return Budget.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
+      return Budget.latestForMonth(
+        snapshot.docs.map((doc) => Budget.fromMap(doc.data(), doc.id)),
+        month,
+      );
     } catch (e) {
       print('Error obteniendo presupuesto: $e');
       return null;
@@ -84,10 +72,10 @@ class BudgetService {
         return {'hasBudget': false};
       }
 
-      // Get expenses for the same month as the budget
+      // El presupuesto puede venir de un mes anterior; el gasto es del actual.
       final expenses = await _transactionService.getUserExpenses(
         userId,
-        month: budget.month,
+        month: currentMonth,
       );
       final totalSpent = expenses.fold<double>(
         0,
@@ -111,8 +99,14 @@ class BudgetService {
       Map<String, Map<String, dynamic>>? categoryStatus;
       if (budget.categoryLimits != null && budget.categoryLimits!.isNotEmpty) {
         categoryStatus = {};
-        final expensesByCategory = await _transactionService
-            .getExpensesByCategory(userId);
+        final expensesByCategory = <String, double>{};
+        for (final expense in expenses) {
+          expensesByCategory.update(
+            expense.category,
+            (total) => total + expense.amount,
+            ifAbsent: () => expense.amount,
+          );
+        }
 
         for (var entry in budget.categoryLimits!.entries) {
           final category = entry.key;
@@ -143,6 +137,7 @@ class BudgetService {
       return {
         'hasBudget': true,
         'budget': budget,
+        'isInherited': budget.month != currentMonth,
         'totalLimit': budget.monthlyLimit,
         'totalSpent': totalSpent,
         'remaining': remaining,
@@ -158,20 +153,15 @@ class BudgetService {
 
   /// Stream del presupuesto actual en tiempo real
   Stream<Budget?> watchCurrentBudget(String userId) {
-    final month =
-        '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
-
+    final month = currentMonth;
     return _db
         .collection('budgets')
         .where('userId', isEqualTo: userId)
-        .where('month', isEqualTo: month)
-        .limit(1)
         .snapshots()
         .map((snapshot) {
-          if (snapshot.docs.isEmpty) return null;
-          return Budget.fromMap(
-            snapshot.docs.first.data(),
-            snapshot.docs.first.id,
+          return Budget.latestForMonth(
+            snapshot.docs.map((doc) => Budget.fromMap(doc.data(), doc.id)),
+            month,
           );
         });
   }

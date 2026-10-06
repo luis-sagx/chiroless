@@ -181,8 +181,10 @@ class _StatisticsPageState extends State<StatisticsPage> {
                       final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              AddBudgetPage(existingBudget: budget),
+                          builder: (context) => AddBudgetPage(
+                            existingBudget: budget,
+                            isInherited: _budgetStatus?['isInherited'] == true,
+                          ),
                         ),
                       );
                       if (result == true && mounted) _loadData();
@@ -212,6 +214,12 @@ class _StatisticsPageState extends State<StatisticsPage> {
               ],
             ),
             const SizedBox(height: 4),
+            if (_budgetStatus?['hasBudget'] == true)
+              Text(
+                _budgetStatus?['isInherited'] == true
+                    ? 'Viene de un mes anterior y se repetirá hasta que lo cambies.'
+                    : 'Se repetirá automáticamente cada mes hasta que lo cambies.',
+              ),
             const Text(
               'Límite de gastos para este mes',
               style: TextStyle(color: AppTheme.textSecondary),
