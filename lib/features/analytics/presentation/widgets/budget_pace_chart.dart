@@ -78,6 +78,7 @@ class BudgetPaceChart extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
+                  horizontalInterval: maxY / 2,
                   getDrawingHorizontalLine: (_) => FlLine(
                     color: AppTheme.textSecondary.withValues(alpha: 0.12),
                     strokeWidth: 1,
@@ -95,22 +96,31 @@ class BudgetPaceChart extends StatelessWidget {
                       showTitles: true,
                       interval: 5,
                       reservedSize: 24,
-                      getTitlesWidget: (value, meta) => SideTitleWidget(
-                        meta: meta,
-                        child: Text(
-                          value.toInt().toString(),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.textSecondary,
+                      getTitlesWidget: (value, meta) {
+                        final day = value.toInt();
+                        if (value != day ||
+                            day % 5 != 0 ||
+                            day >= daysInMonth) {
+                          return const SizedBox.shrink();
+                        }
+                        return SideTitleWidget(
+                          meta: meta,
+                          child: Text(
+                            '$day',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.textSecondary,
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                   ),
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 44,
+                      interval: maxY / 2,
                       getTitlesWidget: (value, meta) => SideTitleWidget(
                         meta: meta,
                         child: Text(

@@ -6,7 +6,6 @@ import '../../../../models/expense_model.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../transactions/data/transaction_service.dart';
 import '../../../budget/data/budget_service.dart';
-import '../../data/metrics_service.dart';
 import '../../../budget/presentation/pages/add_budget_page.dart';
 import '../widgets/budget_pace_chart.dart';
 import '../widgets/category_donut_chart.dart';
@@ -26,14 +25,14 @@ class _StatisticsPageState extends State<StatisticsPage> {
   final _firebaseService = FirebaseService();
   final _transactionService = TransactionService();
   final _budgetService = BudgetService();
-  final _metricsService = MetricsService();
 
   bool _isLoading = true;
   Map<String, double> _expensesByCategory = {};
   double _totalIncome = 0;
   double _totalExpense = 0;
   Map<String, dynamic>? _budgetStatus;
-  String _period = 'PRE';
+  int _trendMonths = 6;
+  int _trendRequest = 0;
   List<MonthTotals> _monthTotals = [];
   List<Expense> _monthExpenses = [];
 
@@ -51,6 +50,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
   }
 
   Future<void> _loadData() async {
+    final trendRequest = ++_trendRequest;
     final user = _firebaseService.currentUser;
     if (user == null) {
       if (mounted) setState(() => _isLoading = false);
@@ -63,25 +63,25 @@ class _StatisticsPageState extends State<StatisticsPage> {
       final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
       final results = await Future.wait<dynamic>([
-        _metricsService.determinePeriod(user.uid),
         _transactionService.getMonthSummary(user.uid, month: month),
         _budgetService.getBudgetStatus(user.uid),
-        _transactionService.getLastMonthsTotals(user.uid),
+        _transactionService.getLastMonthsTotals(user.uid, months: _trendMonths),
         _transactionService.getUserExpenses(user.uid, month: month),
       ]);
-      final summary = results[1] as Map<String, dynamic>;
+      final summary = results[0] as Map<String, dynamic>;
 
       if (!mounted) return;
       setState(() {
-        _period = results[0] as String;
         _totalIncome = (summary['totalIncomes'] ?? 0.0).toDouble();
         _totalExpense = (summary['totalExpenses'] ?? 0.0).toDouble();
         _expensesByCategory = Map<String, double>.from(
           summary['expensesByCategory'] ?? {},
         );
-        _budgetStatus = results[2] as Map<String, dynamic>;
-        _monthTotals = results[3] as List<MonthTotals>;
-        _monthExpenses = results[4] as List<Expense>;
+        _budgetStatus = results[1] as Map<String, dynamic>;
+        if (trendRequest == _trendRequest) {
+          _monthTotals = results[2] as List<MonthTotals>;
+        }
+        _monthExpenses = results[3] as List<Expense>;
         _isLoading = false;
       });
     } catch (e) {
@@ -94,14 +94,54 @@ class _StatisticsPageState extends State<StatisticsPage> {
     }
   }
 
+  Future<void> _changeTrendMonths(int months) async {
+    if (months == _trendMonths) return;
+    final user = _firebaseService.currentUser;
+    if (user == null) return;
+    final previousMonths = _trendMonths;
+    final request = ++_trendRequest;
+    setState(() => _trendMonths = months);
+    try {
+      final totals = await _transactionService.getLastMonthsTotals(
+        user.uid,
+        months: months,
+      );
+      if (mounted && request == _trendRequest) {
+        setState(() => _monthTotals = totals);
+      }
+    } catch (_) {
+      if (mounted && request == _trendRequest) {
+        setState(() => _trendMonths = previousMonths);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo cargar la tendencia')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final balance = _totalIncome - _totalExpense;
     final hasData = _expensesByCategory.isNotEmpty || _totalIncome > 0;
+    final now = DateTime.now();
+    const monthNames = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre',
+    ];
+    final currentMonth = '${monthNames[now.month - 1]} ${now.year}';
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -111,95 +151,15 @@ class _StatisticsPageState extends State<StatisticsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with Period Badge
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Estadísticas',
-                  style: Theme.of(context).textTheme.headlineLarge,
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _period == 'PRE'
-                        ? Colors.blue.shade100
-                        : Colors.green.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'Periodo $_period',
-                    style: TextStyle(
-                      color: _period == 'PRE'
-                          ? Colors.blue.shade900
-                          : Colors.green.shade900,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
+            Text(
+              'Estadísticas',
+              style: Theme.of(context).textTheme.headlineLarge,
             ),
-            const SizedBox(height: 24),
-
-            // Balance Card
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    'Balance del Mes',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '\$${balance.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildBalanceItem(
-                          'Ingresos',
-                          _totalIncome,
-                          Icons.arrow_downward,
-                          AppTheme.incomeColor,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildBalanceItem(
-                          'Gastos',
-                          _totalExpense,
-                          Icons.arrow_upward,
-                          AppTheme.expenseColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            const SizedBox(height: 4),
+            Text(
+              'Resumen de $currentMonth',
+              style: const TextStyle(color: AppTheme.textSecondary),
             ),
-
             const SizedBox(height: 24),
 
             // Budget Section
@@ -244,16 +204,24 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
             const SizedBox(height: 24),
 
-            if (_monthTotals.any((t) => t.income > 0 || t.expense > 0))
-              MonthlyTrendChart(data: _monthTotals),
+            MonthlyTrendChart(
+              data: _monthTotals,
+              months: _trendMonths,
+              onMonthsChanged: _changeTrendMonths,
+            ),
 
             const SizedBox(height: 24),
 
             // Expenses by Category
             if (_expensesByCategory.isNotEmpty) ...[
               Text(
-                'Gastos por Categoría',
+                'Gastos por categoría · $currentMonth',
                 style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Todos los gastos registrados este mes',
+                style: TextStyle(color: AppTheme.textSecondary),
               ),
               const SizedBox(height: 16),
               CategoryDonutChart(expensesByCategory: _expensesByCategory),
@@ -294,45 +262,6 @@ class _StatisticsPageState extends State<StatisticsPage> {
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildBalanceItem(
-    String label,
-    double amount,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: Colors.white, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '\$${amount.toStringAsFixed(2)}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
       ),
     );
   }
