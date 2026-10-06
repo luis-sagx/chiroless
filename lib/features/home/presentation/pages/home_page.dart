@@ -1,5 +1,6 @@
 import '../../../../core/constants/transaction_categories.dart';
 import '../../../../shared/widgets/app_card.dart';
+import '../../../../shared/widgets/lazy_indexed_stack.dart';
 import '../../../../core/services/shortcut_service.dart';
 import '../../../../core/services/home_widget_service.dart';
 import '../../../budget/data/budget_service.dart';
@@ -283,14 +284,14 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: IndexedStack(
+        child: LazyIndexedStack(
           index: _selectedIndex,
-          children: [
-            _buildHomeContent(),
-            StatisticsPage(refreshListenable: _dataVersion),
-            Container(), // Placeholder for center button
-            const AchievementsPage(),
-            _buildProfileContent(),
+          builders: [
+            (_) => _buildHomeContent(),
+            (_) => StatisticsPage(refreshListenable: _dataVersion),
+            (_) => const SizedBox.shrink(), // Placeholder for center button
+            (_) => const AchievementsPage(),
+            (_) => _buildProfileContent(),
           ],
         ),
       ),
