@@ -11,7 +11,9 @@ import '../../../budget/data/budget_service.dart';
 import '../../../../core/services/notification_service.dart';
 
 class AddExpensePage extends StatefulWidget {
-  const AddExpensePage({Key? key}) : super(key: key);
+  final Expense? expense;
+
+  const AddExpensePage({Key? key, this.expense}) : super(key: key);
 
   @override
   State<AddExpensePage> createState() => _AddExpensePageState();
@@ -33,6 +35,20 @@ class _AddExpensePageState extends State<AddExpensePage> {
   DateTime _selectedDate = DateTime.now();
 
   final List<String> _categories = TransactionCategories.expenseNames;
+
+  @override
+  void initState() {
+    super.initState();
+    final expense = widget.expense;
+    if (expense == null) return;
+    _amountController.text = expense.amount.toStringAsFixed(2);
+    _descriptionController.text = expense.description;
+    _selectedCategory = _categories.contains(expense.category)
+        ? expense.category
+        : TransactionCategories.expense.last.name;
+    _selectedDate = expense.date;
+    _isImpulsive = expense.isImpulsive;
+  }
 
   @override
   void dispose() {
@@ -65,7 +81,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
       if (user == null) throw Exception('Usuario no autenticado');
 
       final expense = Expense(
-        id: null,
+        id: widget.expense?.id,
         userId: user.uid,
         amount: double.parse(_amountController.text),
         category: _selectedCategory,
@@ -74,13 +90,20 @@ class _AddExpensePageState extends State<AddExpensePage> {
         isImpulsive: _isImpulsive,
       );
 
-      await _transactionService.createExpense(expense);
-      unawaited(_postSaveTasks(user.uid, expense.amount));
+      final saved = widget.expense == null
+          ? await _transactionService.createExpense(expense) != null
+          : await _transactionService.updateExpense(expense);
+      if (!saved) throw Exception('No se pudo guardar el gasto');
+      if (widget.expense == null) {
+        unawaited(_postSaveTasks(user.uid, expense.amount));
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gasto registrado exitosamente'),
+          SnackBar(
+            content: Text(
+              widget.expense == null ? 'Gasto registrado' : 'Gasto actualizado',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -145,7 +168,10 @@ class _AddExpensePageState extends State<AddExpensePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Agregar Gasto'), elevation: 0),
+      appBar: AppBar(
+        title: Text(widget.expense == null ? 'Agregar Gasto' : 'Editar Gasto'),
+        elevation: 0,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -209,7 +235,9 @@ class _AddExpensePageState extends State<AddExpensePage> {
                                 return 'Ingresa el monto';
                               }
                               final amount = double.tryParse(value);
-                              if (amount == null || amount <= 0) {
+                              if (amount == null ||
+                                  !amount.isFinite ||
+                                  amount <= 0) {
                                 return 'Monto inválido';
                               }
                               return null;

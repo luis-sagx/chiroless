@@ -3,9 +3,66 @@ import '../../../../core/theme/app_theme.dart';
 import 'home_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+enum StartupRoute { home, login }
+
+/// Resuelve la sesión antes de consultar almacenamiento local. Solo el primer
+/// inicio sin sesión conserva una bienvenida corta.
+class StartupGate {
+  const StartupGate({
+    required this.hasSession,
+    required this.hasSeenWelcome,
+    required this.markWelcomeSeen,
+    this.welcomeDuration = const Duration(milliseconds: 700),
+  });
+
+  static const welcomeKey = 'has_seen_startup_welcome';
+
+  final Future<bool> Function() hasSession;
+  final Future<bool> Function() hasSeenWelcome;
+  final Future<void> Function() markWelcomeSeen;
+  final Duration welcomeDuration;
+
+  factory StartupGate.firebase() => StartupGate(
+    hasSession: () async =>
+        FirebaseAuth.instance.authStateChanges().first != null,
+    hasSeenWelcome: () async {
+      final preferences = await SharedPreferences.getInstance();
+      return preferences.getBool(welcomeKey) ?? false;
+    },
+    markWelcomeSeen: () async {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool(welcomeKey, true);
+    },
+  );
+
+  Future<StartupRoute> resolve() async {
+    bool signedIn;
+    try {
+      signedIn = await hasSession();
+    } catch (_) {
+      // Un error de autenticación no debe dejar la pantalla de inicio fija.
+      return StartupRoute.login;
+    }
+    if (signedIn) return StartupRoute.home;
+
+    try {
+      if (!await hasSeenWelcome()) {
+        await markWelcomeSeen();
+        await Future<void>.delayed(welcomeDuration);
+      }
+    } catch (_) {
+      // La persistencia de la bienvenida no debe bloquear el inicio de sesión.
+    }
+    return StartupRoute.login;
+  }
+}
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({super.key, this.gate});
+
+  final StartupGate? gate;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -21,7 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 350),
       vsync: this,
     );
 
@@ -39,15 +96,14 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    _controller.forward().whenComplete(() {
-      if (mounted) _checkAuthAndNavigate();
-    });
+    _controller.forward();
+    _checkAuthAndNavigate();
   }
 
   Future<void> _checkAuthAndNavigate() async {
+    final route = await (widget.gate ?? StartupGate.firebase()).resolve();
     if (!mounted) return;
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
+    if (route == StartupRoute.home) {
       Navigator.of(
         context,
       ).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage()));

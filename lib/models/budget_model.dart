@@ -1,6 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Budget {
+  /// El último cambio vigente; las claves YYYY-MM tienen orden cronológico.
+  static Budget? latestForMonth(Iterable<Budget> budgets, String month) {
+    Budget? latest;
+    for (final budget in budgets) {
+      if (budget.month.compareTo(month) > 0) continue;
+      if (latest == null || budget.month.compareTo(latest.month) > 0) {
+        latest = budget;
+      }
+    }
+    return latest;
+  }
+
   final String? id;
   final String userId;
   final double monthlyLimit;
@@ -55,6 +67,16 @@ class Budget {
       month: month ?? this.month,
       categoryLimits: categoryLimits ?? this.categoryLimits,
       createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  /// Cambiar un límite heredado crea una configuración desde el mes indicado.
+  Budget overrideFrom(String targetMonth, {required double monthlyLimit}) {
+    return Budget(
+      userId: userId,
+      monthlyLimit: monthlyLimit,
+      month: targetMonth,
+      categoryLimits: categoryLimits,
     );
   }
 }

@@ -1,5 +1,6 @@
 import '../../../../core/constants/transaction_categories.dart';
 import '../../../../shared/widgets/app_card.dart';
+import '../../../../shared/widgets/lazy_indexed_stack.dart';
 import '../../../../core/services/shortcut_service.dart';
 import '../../../../core/services/home_widget_service.dart';
 import '../../../budget/data/budget_service.dart';
@@ -14,6 +15,7 @@ import '../../../auth/data/user_service.dart';
 import '../../../../models/user_model.dart';
 import '../../../transactions/presentation/pages/add_expense_page.dart';
 import '../../../transactions/presentation/pages/add_income_page.dart';
+import '../../../transactions/presentation/pages/transactions_page.dart';
 import '../../../analytics/presentation/pages/statistics_page.dart';
 import '../../../achievements/presentation/pages/achievements_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
@@ -204,6 +206,16 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _navigateToTransactions() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TransactionsPage()),
+    );
+    if (!mounted) return;
+    _loadTransactionData();
+    _dataVersion.value++;
+  }
+
   Future<void> _navigateToEditProfile() async {
     final result = await Navigator.push(
       context,
@@ -272,14 +284,14 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: IndexedStack(
+        child: LazyIndexedStack(
           index: _selectedIndex,
-          children: [
-            _buildHomeContent(),
-            StatisticsPage(refreshListenable: _dataVersion),
-            Container(), // Placeholder for center button
-            const AchievementsPage(),
-            _buildProfileContent(),
+          builders: [
+            (_) => _buildHomeContent(),
+            (_) => StatisticsPage(refreshListenable: _dataVersion),
+            (_) => const SizedBox.shrink(), // Placeholder for center button
+            (_) => const AchievementsPage(),
+            (_) => _buildProfileContent(),
           ],
         ),
       ),
@@ -572,7 +584,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => setState(() => _selectedIndex = 1),
+                      onPressed: _navigateToTransactions,
                       child: const Text('Ver todo'),
                     ),
                   ],
