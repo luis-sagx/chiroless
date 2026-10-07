@@ -47,6 +47,27 @@ class TransactionService {
     }
   }
 
+  /// Obtener todo el historial de gastos del usuario, sin filtro mensual.
+  Future<List<Expense>> getAllUserExpenses(
+    String userId, {
+    bool rethrowOnError = false,
+  }) async {
+    try {
+      final snapshot = await _db
+          .collection('expenses')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => Expense.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error obteniendo historial de gastos: $e');
+      if (rethrowOnError) rethrow;
+      return [];
+    }
+  }
+
   /// Obtener gastos por categoría
   Future<Map<String, double>> getExpensesByCategory(
     String userId, {
@@ -158,6 +179,27 @@ class TransactionService {
           .toList();
     } catch (e) {
       print('Error obteniendo ingresos: $e');
+      if (rethrowOnError) rethrow;
+      return [];
+    }
+  }
+
+  /// Obtener todo el historial de ingresos del usuario, sin filtro mensual.
+  Future<List<Income>> getAllUserIncomes(
+    String userId, {
+    bool rethrowOnError = false,
+  }) async {
+    try {
+      final snapshot = await _db
+          .collection('incomes')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => Income.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error obteniendo historial de ingresos: $e');
       if (rethrowOnError) rethrow;
       return [];
     }

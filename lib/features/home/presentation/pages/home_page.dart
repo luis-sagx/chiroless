@@ -106,7 +106,6 @@ class _HomePageState extends State<HomePage> {
           print('Error conciliando movimientos periódicos: $error');
         }
       }
-      final transactionsFuture = _loadTransactionData();
       final userData = await userService.getUser(user.uid);
       if (mounted) {
         setState(() {
@@ -114,7 +113,7 @@ class _HomePageState extends State<HomePage> {
           isLoadingUser = false;
         });
       }
-      await transactionsFuture;
+      await _loadTransactionData();
     }
   }
 
@@ -128,11 +127,20 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final results = await Future.wait([
-        transactionService.getUserExpenses(user.uid),
-        transactionService.getUserIncomes(user.uid),
+        transactionService.getAllUserExpenses(user.uid),
+        transactionService.getAllUserIncomes(user.uid),
       ]);
-      final expenses = results[0] as List<Expense>;
-      final incomes = results[1] as List<Income>;
+      final allExpenses = results[0] as List<Expense>;
+      final allIncomes = results[1] as List<Income>;
+      final now = DateTime.now();
+      final currentMonth =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}';
+      final expenses = allExpenses
+          .where((expense) => expense.month == currentMonth)
+          .toList();
+      final incomes = allIncomes
+          .where((income) => income.month == currentMonth)
+          .toList();
       final totalExpenses = expenses.fold<double>(
         0,
         (sum, expense) => sum + expense.amount,
@@ -141,6 +149,25 @@ class _HomePageState extends State<HomePage> {
         0,
         (sum, income) => sum + income.amount,
       );
+      final openingDate = appUser?.openingBalanceDate ?? DateTime.now();
+      final openingDateStart = DateTime(
+        openingDate.year,
+        openingDate.month,
+        openingDate.day,
+      );
+      final openingExpenses = allExpenses.where(
+        (expense) => !expense.date.isBefore(openingDateStart),
+      );
+      final openingIncomes = allIncomes.where(
+        (income) => !income.date.isBefore(openingDateStart),
+      );
+      final balanceFromOpening =
+          (appUser?.openingBalanceAmount ?? 0) +
+          openingIncomes.fold<double>(0, (sum, income) => sum + income.amount) -
+          openingExpenses.fold<double>(
+            0,
+            (sum, expense) => sum + expense.amount,
+          );
       final List<dynamic> combined = [...expenses, ...incomes];
       combined.sort((a, b) => b.date.compareTo(a.date));
       final counts = <String, int>{};
@@ -152,7 +179,7 @@ class _HomePageState extends State<HomePage> {
 
       if (mounted) {
         setState(() {
-          totalBalance = totalIncomes - totalExpenses;
+          totalBalance = balanceFromOpening;
           totalIncome = totalIncomes;
           totalExpense = totalExpenses;
           recentTransactions = combined.take(5).toList();
@@ -277,17 +304,29 @@ class _HomePageState extends State<HomePage> {
 
   void _applyOptimisticTransaction(QuickAddResult result) {
     final now = DateTime.now();
-    if (result.date.year != now.year || result.date.month != now.month) return;
+    final isCurrentMonth =
+        result.date.year == now.year && result.date.month == now.month;
+    final openingDate = appUser?.openingBalanceDate ?? DateTime.now();
+    final openingDateStart = DateTime(
+      openingDate.year,
+      openingDate.month,
+      openingDate.day,
+    );
+    final affectsBalance = !result.date.isBefore(openingDateStart);
+    if (!isCurrentMonth && !affectsBalance) return;
     setState(() {
-      if (result.isExpense) {
+      if (isCurrentMonth && result.isExpense) {
         totalExpense += result.amount;
-        totalBalance -= result.amount;
-      } else {
+      } else if (isCurrentMonth) {
         totalIncome += result.amount;
+      }
+      if (affectsBalance && result.isExpense) {
+        totalBalance -= result.amount;
+      } else if (affectsBalance) {
         totalBalance += result.amount;
       }
     });
-    if (result.isExpense) unawaited(_syncWidget());
+    if (isCurrentMonth && result.isExpense) unawaited(_syncWidget());
   }
 
   // Actualiza el widget de pantalla de inicio con el gasto del mes.

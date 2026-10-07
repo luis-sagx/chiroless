@@ -5,6 +5,8 @@ class AppUser {
   final String level;
   final int points;
   final DateTime createdAt;
+  final double openingBalanceAmount;
+  final DateTime openingBalanceDate;
 
   AppUser({
     required this.uid,
@@ -13,7 +15,9 @@ class AppUser {
     required this.level,
     this.points = 0,
     required this.createdAt,
-  });
+    this.openingBalanceAmount = 0,
+    DateTime? openingBalanceDate,
+  }) : openingBalanceDate = _dateOnly(openingBalanceDate ?? DateTime.now());
 
   Map<String, dynamic> toMap() {
     return {
@@ -22,6 +26,11 @@ class AppUser {
       'level': level,
       'points': points,
       'createdAt': createdAt,
+      'openingBalanceAmount': openingBalanceAmount,
+      'openingBalanceDate': openingBalanceDate,
     };
   }
+
+  static DateTime _dateOnly(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
 }

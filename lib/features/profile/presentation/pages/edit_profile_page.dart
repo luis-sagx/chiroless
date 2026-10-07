@@ -15,6 +15,7 @@ class EditProfilePage extends StatefulWidget {
 class _EditProfilePageState extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _openingBalanceController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final service = FirebaseService();
@@ -24,6 +25,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   AppUser? appUser;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  DateTime _openingBalanceDate = DateTime.now();
 
   @override
   void initState() {
@@ -34,6 +36,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void dispose() {
     _nameController.dispose();
+    _openingBalanceController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -47,6 +50,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
         setState(() {
           appUser = userData;
           _nameController.text = userData?.name ?? '';
+          _openingBalanceController.text = (userData?.openingBalanceAmount ?? 0)
+              .toStringAsFixed(2);
+          _openingBalanceDate = userData?.openingBalanceDate ?? DateTime.now();
           isLoading = false;
         });
       }
@@ -61,12 +67,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       final user = service.currentUser;
       if (user != null && appUser != null) {
-        // Update user document in Firestore
-        if (_nameController.text.trim() != appUser!.name) {
-          await userService.updateUser(user.uid, {
-            'name': _nameController.text.trim(),
-          });
-        }
+        final openingBalance = double.parse(
+          _openingBalanceController.text.trim().replaceAll(',', '.'),
+        );
+        await userService.updateUser(user.uid, {
+          'name': _nameController.text.trim(),
+          'openingBalanceAmount': openingBalance,
+          'openingBalanceDate': DateTime(
+            _openingBalanceDate.year,
+            _openingBalanceDate.month,
+            _openingBalanceDate.day,
+          ),
+        });
 
         // Update password if provided
         if (_passwordController.text.isNotEmpty) {
@@ -160,6 +172,69 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       },
                     ),
                     const SizedBox(height: 16),
+
+                    const SizedBox(height: 24),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Saldo inicial',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _openingBalanceController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Dinero disponible',
+                        prefixText: '\$ ',
+                        prefixIcon: const Icon(Icons.account_balance_wallet),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      validator: (value) {
+                        final amount = double.tryParse(
+                          (value ?? '').trim().replaceAll(',', '.'),
+                        );
+                        if (amount == null || !amount.isFinite || amount < 0) {
+                          return 'Ingresa un monto válido';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Saldo disponible al',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: _selectOpeningBalanceDate,
+                        icon: const Icon(Icons.calendar_today_outlined),
+                        label: Text(
+                          '${_openingBalanceDate.day.toString().padLeft(2, '0')}/'
+                          '${_openingBalanceDate.month.toString().padLeft(2, '0')}/'
+                          '${_openingBalanceDate.year}',
+                        ),
+                      ),
+                    ),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Los ingresos y gastos registrados desde esta fecha '
+                        'se suman al saldo o se restan de él.',
+                      ),
+                    ),
+                    const SizedBox(height: 24),
 
                     // Password Field
                     TextFormField(
@@ -291,5 +366,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ),
             ),
     );
+  }
+
+  Future<void> _selectOpeningBalanceDate() async {
+    final today = DateTime.now();
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: _openingBalanceDate.isAfter(today)
+          ? today
+          : _openingBalanceDate,
+      firstDate: DateTime(1900),
+      lastDate: DateTime(today.year, today.month, today.day),
+    );
+    if (selectedDate != null && mounted) {
+      setState(() {
+        _openingBalanceDate = DateTime(
+          selectedDate.year,
+          selectedDate.month,
+          selectedDate.day,
+        );
+      });
+    }
   }
 }
