@@ -9,6 +9,8 @@ class Expense {
   final String month; // Formato: "2026-01"
   final String description;
   final bool isImpulsive; // Indicador de gasto impulsivo
+  final String? recurrenceId;
+  final String? recurrenceDate;
 
   Expense({
     this.id,
@@ -19,6 +21,8 @@ class Expense {
     String? month,
     required this.description,
     this.isImpulsive = false,
+    this.recurrenceId,
+    this.recurrenceDate,
   }) : month = month ?? '${date.year}-${date.month.toString().padLeft(2, '0')}';
 
   Map<String, dynamic> toMap() {
@@ -30,6 +34,8 @@ class Expense {
       'month': month,
       'description': description,
       'isImpulsive': isImpulsive,
+      if (recurrenceId != null) 'recurrenceId': recurrenceId,
+      if (recurrenceDate != null) 'recurrenceDate': recurrenceDate,
     };
   }
 
@@ -46,6 +52,8 @@ class Expense {
           '${date.year}-${date.month.toString().padLeft(2, '0')}',
       description: map['description'] ?? '',
       isImpulsive: map['isImpulsive'] ?? false,
+      recurrenceId: map['recurrenceId'],
+      recurrenceDate: map['recurrenceDate'],
     );
   }
 
@@ -58,6 +66,8 @@ class Expense {
     String? month,
     String? description,
     bool? isImpulsive,
+    String? recurrenceId,
+    String? recurrenceDate,
   }) {
     return Expense(
       id: id ?? this.id,
@@ -68,6 +78,8 @@ class Expense {
       month: month ?? (date == null ? this.month : null),
       description: description ?? this.description,
       isImpulsive: isImpulsive ?? this.isImpulsive,
+      recurrenceId: recurrenceId ?? this.recurrenceId,
+      recurrenceDate: recurrenceDate ?? this.recurrenceDate,
     );
   }
 }

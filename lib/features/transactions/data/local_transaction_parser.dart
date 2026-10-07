@@ -1,4 +1,5 @@
 import 'transaction_draft.dart';
+import '../../../core/constants/transaction_categories.dart';
 
 /// Interpreta frases cortas ("12.50 almuerzo ayer") sin red ni IA.
 /// ponytail: diccionario fijo de palabras clave y el primer número es el monto;
@@ -76,18 +77,26 @@ class LocalTransactionParser {
   /// true si el texto tiene alguna palabra (no solo números/símbolos).
   static bool hasWords(String text) => _tokens(text).isNotEmpty;
 
-  static TransactionDraft parse(String text, {DateTime? now}) {
+  static TransactionDraft parse(
+    String text, {
+    DateTime? now,
+    List<String>? expenseCategories,
+    List<String>? incomeCategories,
+  }) {
     final current = now ?? DateTime.now();
     final tokens = _tokens(text);
+    final expenses = expenseCategories ?? TransactionCategories.expenseNames;
+    final incomes = incomeCategories ?? TransactionCategories.incomeNames;
 
     final forcedExpense = tokens.any(_expenseTriggers.contains);
     final isIncome = !forcedExpense &&
         (tokens.any(_incomeTriggers.contains) ||
-            _findCategory(tokens, _incomeKeywords) != null);
+            _findCategory(tokens, _incomeKeywords) != null ||
+            _findNamedCategory(tokens, incomes) != null);
     final category = _findCategory(
       tokens,
       isIncome ? _incomeKeywords : _expenseKeywords,
-    );
+    ) ?? _findNamedCategory(tokens, isIncome ? incomes : expenses);
 
     final match = _amountPattern.firstMatch(text);
     double? amount;
@@ -138,5 +147,16 @@ class LocalTransactionParser {
       if (entry.value.any(tokens.contains)) return entry.key;
     }
     return null;
+  }
+
+  static String? _findNamedCategory(
+    Set<String> tokens,
+    List<String> categories,
+  ) {
+    final matches = categories.where((category) {
+      final categoryTokens = _tokens(category);
+      return categoryTokens.isNotEmpty && categoryTokens.every(tokens.contains);
+    }).toList()..sort((a, b) => b.length.compareTo(a.length));
+    return matches.isEmpty ? null : matches.first;
   }
 }

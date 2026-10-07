@@ -8,6 +8,8 @@ class Income {
   final DateTime date;
   final String month; // Formato: "2026-01"
   final String? description;
+  final String? recurrenceId;
+  final String? recurrenceDate;
 
   Income({
     this.id,
@@ -17,6 +19,8 @@ class Income {
     required this.date,
     String? month,
     this.description,
+    this.recurrenceId,
+    this.recurrenceDate,
   }) : month = month ?? '${date.year}-${date.month.toString().padLeft(2, '0')}';
 
   Map<String, dynamic> toMap() {
@@ -27,6 +31,8 @@ class Income {
       'date': Timestamp.fromDate(date),
       'month': month,
       if (description != null) 'description': description,
+      if (recurrenceId != null) 'recurrenceId': recurrenceId,
+      if (recurrenceDate != null) 'recurrenceDate': recurrenceDate,
     };
   }
 
@@ -42,6 +48,8 @@ class Income {
           map['month'] ??
           '${date.year}-${date.month.toString().padLeft(2, '0')}',
       description: map['description'],
+      recurrenceId: map['recurrenceId'],
+      recurrenceDate: map['recurrenceDate'],
     );
   }
 
@@ -53,6 +61,8 @@ class Income {
     DateTime? date,
     String? month,
     String? description,
+    String? recurrenceId,
+    String? recurrenceDate,
   }) {
     return Income(
       id: id ?? this.id,
@@ -62,6 +72,8 @@ class Income {
       date: date ?? this.date,
       month: month ?? (date == null ? this.month : null),
       description: description ?? this.description,
+      recurrenceId: recurrenceId ?? this.recurrenceId,
+      recurrenceDate: recurrenceDate ?? this.recurrenceDate,
     );
   }
 }

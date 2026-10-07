@@ -24,6 +24,11 @@ class UserService {
           level: data['level'] ?? 'Principiante',
           points: data['points'] ?? 0,
           createdAt: (data['createdAt'] as Timestamp).toDate(),
+          openingBalanceAmount:
+              (data['openingBalanceAmount'] as num?)?.toDouble() ?? 0,
+          openingBalanceDate: _openingBalanceDate(data['openingBalanceDate']),
+          openingBalanceConfigured:
+              data['openingBalanceConfigured'] as bool? ?? false,
         );
       }
       return null;
@@ -43,9 +48,20 @@ class UserService {
           level: data['level'] ?? 'Principiante',
           points: data['points'] ?? 0,
           createdAt: (data['createdAt'] as Timestamp).toDate(),
+          openingBalanceAmount:
+              (data['openingBalanceAmount'] as num?)?.toDouble() ?? 0,
+          openingBalanceDate: _openingBalanceDate(data['openingBalanceDate']),
+          openingBalanceConfigured:
+              data['openingBalanceConfigured'] as bool? ?? false,
         );
       }
       return null;
     });
+  }
+
+  DateTime _openingBalanceDate(Object? value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return DateTime.now();
   }
 }

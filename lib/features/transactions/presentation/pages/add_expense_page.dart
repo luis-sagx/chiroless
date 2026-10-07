@@ -5,7 +5,11 @@ import 'package:flutter/material.dart';
 import '../../../../core/services/firebase_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../models/expense_model.dart';
+import '../../../../models/recurring_transaction_model.dart';
 import '../../data/transaction_service.dart';
+import '../../data/category_service.dart';
+import '../../data/recurring_transaction_service.dart';
+import '../widgets/recurrence_form_fields.dart';
 import '../../../achievements/data/gamification_service.dart';
 import '../../../budget/data/budget_service.dart';
 import '../../../../core/services/notification_service.dart';
@@ -24,6 +28,8 @@ class _AddExpensePageState extends State<AddExpensePage> {
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _transactionService = TransactionService();
+  final _categoryService = CategoryService();
+  final _recurringTransactionService = RecurringTransactionService();
   final _firebaseService = FirebaseService();
   final _gamificationService = GamificationService();
   final _budgetService = BudgetService();
@@ -33,21 +39,51 @@ class _AddExpensePageState extends State<AddExpensePage> {
   bool _isImpulsive = false;
   bool _isLoading = false;
   DateTime _selectedDate = DateTime.now();
+  bool _isRecurring = false;
+  RecurrenceFrequency _recurrenceFrequency = RecurrenceFrequency.monthly;
+  DateTime? _recurrenceEndDate;
 
-  final List<String> _categories = TransactionCategories.expenseNames;
+  List<String> _categories = TransactionCategories.expenseNames;
 
   @override
   void initState() {
     super.initState();
+    unawaited(_loadCategories());
     final expense = widget.expense;
     if (expense == null) return;
     _amountController.text = expense.amount.toStringAsFixed(2);
     _descriptionController.text = expense.description;
-    _selectedCategory = _categories.contains(expense.category)
-        ? expense.category
-        : TransactionCategories.expense.last.name;
+    if (!_categories.contains(expense.category)) {
+      _categories.insert(0, expense.category);
+    }
+    _selectedCategory = expense.category;
     _selectedDate = expense.date;
     _isImpulsive = expense.isImpulsive;
+  }
+
+  Future<void> _loadCategories() async {
+    final user = _firebaseService.currentUser;
+    if (user == null) return;
+    try {
+      final categories = await _categoryService.getCategories(
+        user.uid,
+        TransactionCategoryType.expense,
+      );
+      final historicalCategory = widget.expense?.category;
+      if (historicalCategory != null &&
+          !categories.contains(historicalCategory)) {
+        categories.insert(0, historicalCategory);
+      }
+      if (!mounted) return;
+      setState(() {
+        _categories = categories;
+        if (!_categories.contains(_selectedCategory)) {
+          _selectedCategory = _categories.first;
+        }
+      });
+    } catch (error) {
+      print('Error cargando categorías de gastos: $error');
+    }
   }
 
   @override
@@ -67,6 +103,14 @@ class _AddExpensePageState extends State<AddExpensePage> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
+        if (_recurrenceEndDate != null &&
+            DateTime(
+              _recurrenceEndDate!.year,
+              _recurrenceEndDate!.month,
+              _recurrenceEndDate!.day,
+            ).isBefore(DateTime(picked.year, picked.month, picked.day))) {
+          _recurrenceEndDate = null;
+        }
       });
     }
   }
@@ -88,10 +132,12 @@ class _AddExpensePageState extends State<AddExpensePage> {
         description: _descriptionController.text.trim(),
         date: _selectedDate,
         isImpulsive: _isImpulsive,
+        recurrenceId: widget.expense?.recurrenceId,
+        recurrenceDate: widget.expense?.recurrenceDate,
       );
 
       final saved = widget.expense == null
-          ? await _transactionService.createExpense(expense) != null
+          ? await _saveNewExpense(user.uid, expense)
           : await _transactionService.updateExpense(expense);
       if (!saved) throw Exception('No se pudo guardar el gasto');
       if (widget.expense == null) {
@@ -123,6 +169,33 @@ class _AddExpensePageState extends State<AddExpensePage> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<bool> _saveNewExpense(String userId, Expense expense) async {
+    if (!_isRecurring) {
+      return await _transactionService.createExpense(expense) != null;
+    }
+    final seriesId = await _recurringTransactionService.createSeries(
+      RecurringTransaction(
+        userId: userId,
+        isExpense: true,
+        amount: expense.amount,
+        category: expense.category,
+        startDate: expense.date,
+        frequency: _recurrenceFrequency,
+        endDate: _recurrenceEndDate,
+        description: expense.description,
+        isImpulsive: expense.isImpulsive,
+      ),
+    );
+    if (seriesId == null) return false;
+    try {
+      await _recurringTransactionService.reconcileForUser(userId);
+    } catch (error) {
+      // The series is saved; the next app open will retry its due occurrences.
+      print('Error registrando primera ocurrencia del gasto: $error');
+    }
+    return true;
   }
 
   Future<void> _postSaveTasks(String userId, double amount) async {
@@ -249,6 +322,28 @@ class _AddExpensePageState extends State<AddExpensePage> {
                   ],
                 ),
               ),
+
+              if (widget.expense == null) ...[
+                const SizedBox(height: 12),
+                RecurrenceFormFields(
+                  enabled: _isRecurring,
+                  frequency: _recurrenceFrequency,
+                  startDate: _selectedDate,
+                  endDate: _recurrenceEndDate,
+                  onEnabledChanged: (value) =>
+                      setState(() => _isRecurring = value),
+                  onFrequencyChanged: (value) =>
+                      setState(() => _recurrenceFrequency = value),
+                  onEndDateChanged: (value) =>
+                      setState(() => _recurrenceEndDate = value),
+                ),
+              ] else if (widget.expense?.recurrenceId != null) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Este movimiento pertenece a una serie. Los cambios solo afectan a este movimiento.',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
+              ],
 
               const SizedBox(height: 24),
 

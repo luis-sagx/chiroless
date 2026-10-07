@@ -25,12 +25,17 @@ import '../../../profile/presentation/pages/about_page.dart';
 import '../../../profile/presentation/pages/terms_conditions_page.dart';
 import '../../../ai_assistant/presentation/pages/ai_assistant_page.dart';
 import '../../../transactions/data/transaction_service.dart';
+import '../../../transactions/data/recurring_transaction_service.dart';
+import '../../../transactions/data/category_service.dart';
+import '../../../transactions/presentation/pages/category_management_page.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../../../models/expense_model.dart';
 import '../../../../models/income_model.dart';
 import '../../../transactions/presentation/widgets/quick_add_sheet.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+
+enum _HomeTransactionAction { edit, delete }
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -43,6 +48,8 @@ class _HomePageState extends State<HomePage> {
   final service = FirebaseService();
   final userService = UserService();
   final transactionService = TransactionService();
+  final _recurringTransactionService = RecurringTransactionService();
+  final _categoryService = CategoryService();
   final _budgetService = BudgetService();
   bool _widgetHidden = false;
   int _selectedIndex = 0;
@@ -60,7 +67,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     initializeDateFormatting('es', null);
-    _loadUser();
+    _loadUser(reconcileRecurring: true);
     ShortcutService.pending.addListener(_handleShortcut);
     WidgetsBinding.instance.addPostFrameCallback((_) => _handleShortcut());
     HomeWidgetService.isHidden().then((v) {
@@ -82,10 +89,23 @@ class _HomePageState extends State<HomePage> {
     _showAddTransactionOptions(isExpense: type != ShortcutService.addIncome);
   }
 
-  Future<void> _loadUser() async {
+  Future<void> _loadUser({bool reconcileRecurring = false}) async {
     final user = service.currentUser;
     if (user != null) {
-      final transactionsFuture = _loadTransactionData();
+      try {
+        await _categoryService.ensureInitialized(user.uid);
+      } catch (error) {
+        // Category loading in individual forms can retry without blocking Home.
+        print('Error inicializando categorías: $error');
+      }
+      if (reconcileRecurring) {
+        try {
+          await _recurringTransactionService.reconcileForUser(user.uid);
+        } catch (error) {
+          // A temporary Firestore error must not prevent the user entering Home.
+          print('Error conciliando movimientos periódicos: $error');
+        }
+      }
       final userData = await userService.getUser(user.uid);
       if (mounted) {
         setState(() {
@@ -93,7 +113,7 @@ class _HomePageState extends State<HomePage> {
           isLoadingUser = false;
         });
       }
-      await transactionsFuture;
+      await _loadTransactionData();
     }
   }
 
@@ -107,11 +127,20 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final results = await Future.wait([
-        transactionService.getUserExpenses(user.uid),
-        transactionService.getUserIncomes(user.uid),
+        transactionService.getAllUserExpenses(user.uid),
+        transactionService.getAllUserIncomes(user.uid),
       ]);
-      final expenses = results[0] as List<Expense>;
-      final incomes = results[1] as List<Income>;
+      final allExpenses = results[0] as List<Expense>;
+      final allIncomes = results[1] as List<Income>;
+      final now = DateTime.now();
+      final currentMonth =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}';
+      final expenses = allExpenses
+          .where((expense) => expense.month == currentMonth)
+          .toList();
+      final incomes = allIncomes
+          .where((income) => income.month == currentMonth)
+          .toList();
       final totalExpenses = expenses.fold<double>(
         0,
         (sum, expense) => sum + expense.amount,
@@ -120,6 +149,25 @@ class _HomePageState extends State<HomePage> {
         0,
         (sum, income) => sum + income.amount,
       );
+      final openingDate = appUser?.openingBalanceDate ?? DateTime.now();
+      final openingDateStart = DateTime(
+        openingDate.year,
+        openingDate.month,
+        openingDate.day,
+      );
+      final openingExpenses = allExpenses.where(
+        (expense) => !expense.date.isBefore(openingDateStart),
+      );
+      final openingIncomes = allIncomes.where(
+        (income) => !income.date.isBefore(openingDateStart),
+      );
+      final balanceFromOpening =
+          (appUser?.openingBalanceAmount ?? 0) +
+          openingIncomes.fold<double>(0, (sum, income) => sum + income.amount) -
+          openingExpenses.fold<double>(
+            0,
+            (sum, expense) => sum + expense.amount,
+          );
       final List<dynamic> combined = [...expenses, ...incomes];
       combined.sort((a, b) => b.date.compareTo(a.date));
       final counts = <String, int>{};
@@ -131,7 +179,7 @@ class _HomePageState extends State<HomePage> {
 
       if (mounted) {
         setState(() {
-          totalBalance = totalIncomes - totalExpenses;
+          totalBalance = balanceFromOpening;
           totalIncome = totalIncomes;
           totalExpense = totalExpenses;
           recentTransactions = combined.take(5).toList();
@@ -256,17 +304,29 @@ class _HomePageState extends State<HomePage> {
 
   void _applyOptimisticTransaction(QuickAddResult result) {
     final now = DateTime.now();
-    if (result.date.year != now.year || result.date.month != now.month) return;
+    final isCurrentMonth =
+        result.date.year == now.year && result.date.month == now.month;
+    final openingDate = appUser?.openingBalanceDate ?? DateTime.now();
+    final openingDateStart = DateTime(
+      openingDate.year,
+      openingDate.month,
+      openingDate.day,
+    );
+    final affectsBalance = !result.date.isBefore(openingDateStart);
+    if (!isCurrentMonth && !affectsBalance) return;
     setState(() {
-      if (result.isExpense) {
+      if (isCurrentMonth && result.isExpense) {
         totalExpense += result.amount;
-        totalBalance -= result.amount;
-      } else {
+      } else if (isCurrentMonth) {
         totalIncome += result.amount;
+      }
+      if (affectsBalance && result.isExpense) {
+        totalBalance -= result.amount;
+      } else if (affectsBalance) {
         totalBalance += result.amount;
       }
     });
-    if (result.isExpense) unawaited(_syncWidget());
+    if (isCurrentMonth && result.isExpense) unawaited(_syncWidget());
   }
 
   // Actualiza el widget de pantalla de inicio con el gasto del mes.
@@ -508,6 +568,32 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               ],
                             ),
+                            if (appUser != null &&
+                                !appUser!.openingBalanceConfigured) ...[
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Configura el dinero que tenías al comenzar '
+                                'para calcular tu saldo disponible.',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                onPressed: _navigateToEditProfile,
+                                icon: const Icon(
+                                  Icons.account_balance_wallet_outlined,
+                                ),
+                                label: const Text('Configurar saldo inicial'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  side: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                 ),
@@ -710,6 +796,18 @@ class _HomePageState extends State<HomePage> {
               'Editar perfil',
               _navigateToEditProfile,
             ),
+            _buildMenuItem(
+              Icons.category_outlined,
+              'Administrar categorías',
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CategoryManagementPage(),
+                  ),
+                );
+              },
+            ),
             _buildMenuItem(Icons.help_outline, 'Ayuda', () {
               Navigator.push(
                 context,
@@ -890,49 +988,144 @@ class _HomePageState extends State<HomePage> {
         ? TransactionCategories.expenseInfo(title)
         : TransactionCategories.incomeInfo(title);
 
-    return AppCard(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: info.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+    return GestureDetector(
+      onLongPress: () => _showTransactionActions(transaction, isExpense),
+      child: AppCard(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: info.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(info.icon, color: info.color, size: 20),
             ),
-            child: Icon(info.icon, color: info.color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-                Text(
-                  DateFormat('d MMM yyyy', 'es').format(date),
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
-              ],
+                  Text(
+                    DateFormat('d MMM yyyy', 'es').format(date),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
+            Text(
+              '${isExpense ? '-' : '+'}\$${amount.toStringAsFixed(2)}',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showTransactionActions(
+    dynamic transaction,
+    bool isExpense,
+  ) async {
+    final action = await showModalBottomSheet<_HomeTransactionAction>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Editar movimiento'),
+              onTap: () => Navigator.pop(context, _HomeTransactionAction.edit),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Eliminar movimiento'),
+              textColor: Colors.red,
+              onTap: () =>
+                  Navigator.pop(context, _HomeTransactionAction.delete),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action == null) return;
+    if (action == _HomeTransactionAction.edit) {
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => isExpense
+              ? AddExpensePage(expense: transaction as Expense)
+              : AddIncomePage(income: transaction as Income),
+        ),
+      );
+      if (result == true && mounted) {
+        await _refreshAfterTransactionChange();
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar movimiento'),
+        content: const Text('¿Seguro que quieres eliminar este movimiento?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
           ),
-          Text(
-            '${isExpense ? '-' : '+'}\$${amount.toStringAsFixed(2)}',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Eliminar'),
           ),
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+
+    final id = isExpense
+        ? (transaction as Expense).id
+        : (transaction as Income).id;
+    final deleted =
+        id != null &&
+        (isExpense
+            ? await transactionService.deleteExpense(id)
+            : await transactionService.deleteIncome(id));
+    if (!mounted) return;
+    if (!deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo eliminar el movimiento')),
+      );
+      return;
+    }
+
+    await _refreshAfterTransactionChange();
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Movimiento eliminado')));
+    }
+  }
+
+  Future<void> _refreshAfterTransactionChange() async {
+    await _loadTransactionData();
+    if (mounted) _dataVersion.value++;
   }
 
   Widget _buildEmptyState() {
