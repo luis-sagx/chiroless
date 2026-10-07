@@ -249,11 +249,11 @@ void main() {
   });
 
   group('TransactionCategories', () {
-    test('lookup con fallback a Otros', () {
+    test('lookup conserva el nombre de categorías personalizadas', () {
       expect(TransactionCategories.expenseInfo('Salud').name, 'Salud');
-      expect(TransactionCategories.expenseInfo('nada').name, 'Otros');
+      expect(TransactionCategories.expenseInfo('nada').name, 'nada');
       expect(TransactionCategories.incomeInfo('Beca').name, 'Beca');
-      expect(TransactionCategories.incomeInfo('nada').name, 'Otros');
+      expect(TransactionCategories.incomeInfo('nada').name, 'nada');
       expect(TransactionCategories.expenseNames, contains('Ropa'));
       expect(TransactionCategories.incomeNames, contains('Salario'));
     });
