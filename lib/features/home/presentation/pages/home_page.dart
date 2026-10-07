@@ -35,6 +35,8 @@ import '../../../transactions/presentation/widgets/quick_add_sheet.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+enum _HomeTransactionAction { edit, delete }
+
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -921,49 +923,144 @@ class _HomePageState extends State<HomePage> {
         ? TransactionCategories.expenseInfo(title)
         : TransactionCategories.incomeInfo(title);
 
-    return AppCard(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: info.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+    return GestureDetector(
+      onLongPress: () => _showTransactionActions(transaction, isExpense),
+      child: AppCard(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: info.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(info.icon, color: info.color, size: 20),
             ),
-            child: Icon(info.icon, color: info.color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-                Text(
-                  DateFormat('d MMM yyyy', 'es').format(date),
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
-              ],
+                  Text(
+                    DateFormat('d MMM yyyy', 'es').format(date),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
+            Text(
+              '${isExpense ? '-' : '+'}\$${amount.toStringAsFixed(2)}',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showTransactionActions(
+    dynamic transaction,
+    bool isExpense,
+  ) async {
+    final action = await showModalBottomSheet<_HomeTransactionAction>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Editar movimiento'),
+              onTap: () => Navigator.pop(context, _HomeTransactionAction.edit),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Eliminar movimiento'),
+              textColor: Colors.red,
+              onTap: () =>
+                  Navigator.pop(context, _HomeTransactionAction.delete),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action == null) return;
+    if (action == _HomeTransactionAction.edit) {
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => isExpense
+              ? AddExpensePage(expense: transaction as Expense)
+              : AddIncomePage(income: transaction as Income),
+        ),
+      );
+      if (result == true && mounted) {
+        await _refreshAfterTransactionChange();
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar movimiento'),
+        content: const Text('¿Seguro que quieres eliminar este movimiento?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
           ),
-          Text(
-            '${isExpense ? '-' : '+'}\$${amount.toStringAsFixed(2)}',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Eliminar'),
           ),
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+
+    final id = isExpense
+        ? (transaction as Expense).id
+        : (transaction as Income).id;
+    final deleted =
+        id != null &&
+        (isExpense
+            ? await transactionService.deleteExpense(id)
+            : await transactionService.deleteIncome(id));
+    if (!mounted) return;
+    if (!deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo eliminar el movimiento')),
+      );
+      return;
+    }
+
+    await _refreshAfterTransactionChange();
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Movimiento eliminado')));
+    }
+  }
+
+  Future<void> _refreshAfterTransactionChange() async {
+    await _loadTransactionData();
+    if (mounted) _dataVersion.value++;
   }
 
   Widget _buildEmptyState() {
