@@ -21,42 +21,55 @@ class TransactionExtractionService {
 
   final GenerativeModel _model;
 
-  static List<String> get _allCategories => {
-    ...TransactionCategories.expenseNames,
-    ...TransactionCategories.incomeNames,
-  }.toList();
-
   static final Schema _schema = Schema.object(
     properties: {
       'isExpense': Schema.boolean(),
       'amount': Schema.number(),
-      'category': Schema.enumString(enumValues: _allCategories),
+      'category': Schema.string(),
       'description': Schema.string(),
       'date': Schema.string(),
     },
     optionalProperties: ['amount', 'description', 'date'],
   );
 
-  Future<TransactionDraft?> fromText(String text) {
-    final prompt = '${_instructions()}\nTexto del usuario: """$text"""';
-    return _run([Content.text(prompt)]);
+  Future<TransactionDraft?> fromText(
+    String text, {
+    List<String>? expenseCategories,
+    List<String>? incomeCategories,
+  }) {
+    final expenses = expenseCategories ?? TransactionCategories.expenseNames;
+    final incomes = incomeCategories ?? TransactionCategories.incomeNames;
+    final prompt =
+        '${_instructions(expenses, incomes)}\nTexto del usuario: """$text"""';
+    return _run([Content.text(prompt)], expenses, incomes);
   }
 
-  Future<TransactionDraft?> fromImage(Uint8List bytes, String mimeType) {
+  Future<TransactionDraft?> fromImage(
+    Uint8List bytes,
+    String mimeType, {
+    List<String>? expenseCategories,
+    List<String>? incomeCategories,
+  }) {
+    final expenses = expenseCategories ?? TransactionCategories.expenseNames;
+    final incomes = incomeCategories ?? TransactionCategories.incomeNames;
     final prompt =
-        '${_instructions()}\n'
+        '${_instructions(expenses, incomes)}\n'
         'La imagen es una captura de un comprobante de transferencia, pago, '
         'depósito o recibo. Si el usuario envió o pagó dinero, isExpense es '
         'true; si lo recibió, isExpense es false. Si no se puede saber, usa '
         'isExpense = true. En description NO incluyas números de cuenta, '
         'cédulas ni nombres completos: como máximo el primer nombre de la otra '
         'persona o el nombre del comercio.';
-    return _run([
-      Content.multi([TextPart(prompt), InlineDataPart(mimeType, bytes)]),
-    ]);
+    return _run(
+      [
+        Content.multi([TextPart(prompt), InlineDataPart(mimeType, bytes)]),
+      ],
+      expenses,
+      incomes,
+    );
   }
 
-  String _instructions() {
+  String _instructions(List<String> expenses, List<String> incomes) {
     final now = DateTime.now();
     final today =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-'
@@ -68,36 +81,44 @@ class TransactionExtractionService {
         'category (elige SOLO de la lista que corresponda al tipo; si dudas '
         'usa "Otros"), description (máximo 6 palabras, en español), '
         'date (formato YYYY-MM-DD; si no se menciona, usa $today).\n'
-        'Categorías de gasto: ${TransactionCategories.expenseNames.join(', ')}.\n'
-        'Categorías de ingreso: ${TransactionCategories.incomeNames.join(', ')}.';
+        'Categorías de gasto: ${expenses.join(', ')}.\n'
+        'Categorías de ingreso: ${incomes.join(', ')}.';
   }
 
-  Future<TransactionDraft?> _run(List<Content> content) async {
+  Future<TransactionDraft?> _run(
+    List<Content> content,
+    List<String> expenses,
+    List<String> incomes,
+  ) async {
     try {
       final response = await _model.generateContent(content);
       final text = response.text;
       if (text == null) return null;
       final map = jsonDecode(text) as Map<String, dynamic>;
-      return _toDraft(map);
+      return _toDraft(map, expenses, incomes);
     } catch (e) {
       print('Error extrayendo transacción: $e');
       return null;
     }
   }
 
-  TransactionDraft _toDraft(Map<String, dynamic> map) {
+  TransactionDraft _toDraft(
+    Map<String, dynamic> map,
+    List<String> expenses,
+    List<String> incomes,
+  ) {
     final isExpense = map['isExpense'] != false;
     final rawAmount = map['amount'];
     final amount = rawAmount is num && rawAmount > 0
         ? rawAmount.toDouble()
         : null;
-    final valid = isExpense
-        ? TransactionCategories.expenseNames
-        : TransactionCategories.incomeNames;
+    final valid = isExpense ? expenses : incomes;
     final rawCategory = map['category'];
     final category = rawCategory is String && valid.contains(rawCategory)
         ? rawCategory
-        : 'Otros';
+        : valid.isEmpty
+        ? 'Otros'
+        : valid.first;
     final rawDescription = map['description'];
     return TransactionDraft(
       isExpense: isExpense,

@@ -15,6 +15,7 @@ import '../../data/local_transaction_parser.dart';
 import '../../data/transaction_draft.dart';
 import '../../data/transaction_extraction_service.dart';
 import '../../data/transaction_service.dart';
+import '../../data/category_service.dart';
 import '../pages/add_expense_page.dart';
 import '../pages/add_income_page.dart';
 
@@ -51,6 +52,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
   final _amountController = TextEditingController();
   final _smartController = TextEditingController();
   final _transactionService = TransactionService();
+  final _categoryService = CategoryService();
   final _gamificationService = GamificationService();
   final _firebaseService = FirebaseService();
   final _extractionService = TransactionExtractionService();
@@ -65,17 +67,18 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
   bool _isInterpreting = false;
   bool _isListening = false;
   bool _isSaving = false;
+  List<String> _expenseCategories = TransactionCategories.expenseNames;
+  List<String> _incomeCategories = TransactionCategories.incomeNames;
 
   List<String> get _expenseOptions {
-    final defaults = TransactionCategories.expenseNames;
+    final defaults = _expenseCategories;
     final ordered = widget.expenseCategoryOrder
         .where(defaults.contains)
         .toList();
     return [...ordered, ...defaults.where((c) => !ordered.contains(c))];
   }
 
-  List<String> get _options =>
-      _isExpense ? _expenseOptions : TransactionCategories.incomeNames;
+  List<String> get _options => _isExpense ? _expenseOptions : _incomeCategories;
 
   Color get _modeColor =>
       _isExpense ? AppTheme.expenseColor : AppTheme.incomeColor;
@@ -96,6 +99,34 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
     super.initState();
     _isExpense = widget.initialIsExpense;
     _selectedCategory = _options.first;
+    unawaited(_loadCategories());
+  }
+
+  Future<void> _loadCategories() async {
+    final user = _firebaseService.currentUser;
+    if (user == null) return;
+    try {
+      final categories = await Future.wait([
+        _categoryService.getCategories(
+          user.uid,
+          TransactionCategoryType.expense,
+        ),
+        _categoryService.getCategories(
+          user.uid,
+          TransactionCategoryType.income,
+        ),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _expenseCategories = categories[0];
+        _incomeCategories = categories[1];
+        if (!_options.contains(_selectedCategory)) {
+          _selectedCategory = _options.first;
+        }
+      });
+    } catch (error) {
+      print('Error cargando categorías para registro rápido: $error');
+    }
   }
 
   @override
@@ -135,7 +166,11 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
     final input = text.trim();
     if (input.isEmpty || _isInterpreting) return;
 
-    final local = LocalTransactionParser.parse(input);
+    final local = LocalTransactionParser.parse(
+      input,
+      expenseCategories: _expenseOptions,
+      incomeCategories: _incomeCategories,
+    );
     if (local.isComplete || !LocalTransactionParser.hasWords(input)) {
       _applyDraft(local, 'Revisa los datos y toca Guardar');
       return;
@@ -145,7 +180,11 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
       _isInterpreting = true;
       _smartMessage = 'Interpretando…';
     });
-    final aiDraft = await _extractionService.fromText(input);
+    final aiDraft = await _extractionService.fromText(
+      input,
+      expenseCategories: _expenseOptions,
+      incomeCategories: _incomeCategories,
+    );
     if (!mounted) return;
     setState(() => _isInterpreting = false);
     _applyDraft(

@@ -26,6 +26,8 @@ import '../../../profile/presentation/pages/terms_conditions_page.dart';
 import '../../../ai_assistant/presentation/pages/ai_assistant_page.dart';
 import '../../../transactions/data/transaction_service.dart';
 import '../../../transactions/data/recurring_transaction_service.dart';
+import '../../../transactions/data/category_service.dart';
+import '../../../transactions/presentation/pages/category_management_page.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../../../models/expense_model.dart';
 import '../../../../models/income_model.dart';
@@ -45,6 +47,7 @@ class _HomePageState extends State<HomePage> {
   final userService = UserService();
   final transactionService = TransactionService();
   final _recurringTransactionService = RecurringTransactionService();
+  final _categoryService = CategoryService();
   final _budgetService = BudgetService();
   bool _widgetHidden = false;
   int _selectedIndex = 0;
@@ -87,6 +90,12 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadUser({bool reconcileRecurring = false}) async {
     final user = service.currentUser;
     if (user != null) {
+      try {
+        await _categoryService.ensureInitialized(user.uid);
+      } catch (error) {
+        // Category loading in individual forms can retry without blocking Home.
+        print('Error inicializando categorías: $error');
+      }
       if (reconcileRecurring) {
         try {
           await _recurringTransactionService.reconcileForUser(user.uid);
@@ -719,6 +728,18 @@ class _HomePageState extends State<HomePage> {
               Icons.person_outline,
               'Editar perfil',
               _navigateToEditProfile,
+            ),
+            _buildMenuItem(
+              Icons.category_outlined,
+              'Administrar categorías',
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CategoryManagementPage(),
+                  ),
+                );
+              },
             ),
             _buildMenuItem(Icons.help_outline, 'Ayuda', () {
               Navigator.push(

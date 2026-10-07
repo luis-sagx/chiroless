@@ -41,11 +41,21 @@ class TransactionCategories {
 
   static List<String> get incomeNames => income.map((c) => c.name).toList();
 
-  /// Devuelve la info de una categoría de gasto; si no existe, la de "Otros".
-  static CategoryInfo expenseInfo(String name) =>
-      expense.firstWhere((c) => c.name == name, orElse: () => expense.last);
+  /// Gives user-created categories a stable visual identity without changing
+  /// their stored name (which is also the historical transaction value).
+  static CategoryInfo expenseInfo(String name) => _info(expense, name);
 
-  /// Devuelve la info de una fuente de ingreso; si no existe, la de "Otros".
-  static CategoryInfo incomeInfo(String name) =>
-      income.firstWhere((c) => c.name == name, orElse: () => income.last);
+  static CategoryInfo incomeInfo(String name) => _info(income, name);
+
+  static CategoryInfo _info(List<CategoryInfo> defaults, String name) {
+    final existing = defaults.where((category) => category.name == name);
+    if (existing.isNotEmpty) return existing.first;
+    var stableHash = 0;
+    for (final rune in name.runes) {
+      stableHash = (stableHash * 31 + rune) & 0x7fffffff;
+    }
+    final index = stableHash % defaults.length;
+    final fallback = defaults[index];
+    return CategoryInfo(name, fallback.icon, fallback.color);
+  }
 }

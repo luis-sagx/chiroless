@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/services/firebase_service.dart';
 import '../../../../core/constants/transaction_categories.dart';
+import '../../../transactions/data/category_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../models/expense_model.dart';
 import '../../../../models/income_model.dart';
@@ -27,12 +28,14 @@ class _StatisticsPageState extends State<StatisticsPage> {
   final _firebaseService = FirebaseService();
   final _transactionService = TransactionService();
   final _budgetService = BudgetService();
+  final _categoryService = CategoryService();
 
   bool _isLoading = true;
   bool _trendLoading = false;
   String? _loadError;
   String? _trendError;
   Map<String, double> _expensesByCategory = {};
+  List<String> _expenseCategoryNames = [];
   double _totalIncome = 0;
   double _totalExpense = 0;
   Map<String, dynamic>? _budgetStatus;
@@ -87,10 +90,15 @@ class _StatisticsPageState extends State<StatisticsPage> {
           rethrowOnError: true,
         ),
         _budgetService.getCurrentBudget(user.uid, rethrowOnError: true),
+        _categoryService.getCategories(
+          user.uid,
+          TransactionCategoryType.expense,
+        ),
       ]);
       final expenses = current[0] as List<Expense>;
       final incomes = current[1] as List<Income>;
       final budget = current[2] as Budget?;
+      final expenseCategoryNames = current[3] as List<String>;
       final totalExpense = expenses.fold<double>(
         0,
         (sum, expense) => sum + expense.amount,
@@ -117,6 +125,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
         _totalIncome = totalIncome;
         _totalExpense = totalExpense;
         _expensesByCategory = categories;
+        _expenseCategoryNames = expenseCategoryNames;
         _budgetStatus = BudgetService.calculateBudgetStatus(
           budget,
           expenses,
@@ -567,7 +576,11 @@ class _StatisticsPageState extends State<StatisticsPage> {
   }
 
   Widget _buildCategoryList() {
-    final sortedCategories = _expensesByCategory.entries.toList()
+    final categoryTotals = Map<String, double>.from(_expensesByCategory);
+    for (final category in _expenseCategoryNames) {
+      categoryTotals.putIfAbsent(category, () => 0);
+    }
+    final sortedCategories = categoryTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final maxAmount = sortedCategories.isNotEmpty
         ? sortedCategories.first.value
@@ -621,7 +634,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(5),
                       child: LinearProgressIndicator(
-                        value: (entry.value / maxAmount).clamp(0.0, 1.0),
+                        value: maxAmount > 0
+                            ? (entry.value / maxAmount).clamp(0.0, 1.0)
+                            : 0,
                         minHeight: 6,
                         backgroundColor: info.color.withValues(alpha: 0.12),
                         valueColor: AlwaysStoppedAnimation<Color>(info.color),

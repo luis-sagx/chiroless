@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../models/income_model.dart';
 import '../../../../models/recurring_transaction_model.dart';
 import '../../data/transaction_service.dart';
+import '../../data/category_service.dart';
 import '../../data/recurring_transaction_service.dart';
 import '../../../achievements/data/gamification_service.dart';
 import '../widgets/recurrence_form_fields.dart';
@@ -25,6 +26,7 @@ class _AddIncomePageState extends State<AddIncomePage> {
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _transactionService = TransactionService();
+  final _categoryService = CategoryService();
   final _recurringTransactionService = RecurringTransactionService();
   final _firebaseService = FirebaseService();
   final _gamificationService = GamificationService();
@@ -36,19 +38,42 @@ class _AddIncomePageState extends State<AddIncomePage> {
   RecurrenceFrequency _recurrenceFrequency = RecurrenceFrequency.monthly;
   DateTime? _recurrenceEndDate;
 
-  final List<String> _sources = TransactionCategories.incomeNames;
+  List<String> _sources = TransactionCategories.incomeNames;
 
   @override
   void initState() {
     super.initState();
+    unawaited(_loadCategories());
     final income = widget.income;
     if (income == null) return;
     _amountController.text = income.amount.toStringAsFixed(2);
     _descriptionController.text = income.description ?? '';
-    _selectedSource = _sources.contains(income.source)
-        ? income.source
-        : TransactionCategories.income.last.name;
+    if (!_sources.contains(income.source)) _sources.insert(0, income.source);
+    _selectedSource = income.source;
     _selectedDate = income.date;
+  }
+
+  Future<void> _loadCategories() async {
+    final user = _firebaseService.currentUser;
+    if (user == null) return;
+    try {
+      final categories = await _categoryService.getCategories(
+        user.uid,
+        TransactionCategoryType.income,
+      );
+      final historicalSource = widget.income?.source;
+      if (historicalSource != null && !categories.contains(historicalSource)) {
+        categories.insert(0, historicalSource);
+      }
+      if (!mounted) return;
+      setState(() {
+        _sources = categories;
+        if (!_sources.contains(_selectedSource))
+          _selectedSource = _sources.first;
+      });
+    } catch (error) {
+      print('Error cargando categorías de ingresos: $error');
+    }
   }
 
   @override
