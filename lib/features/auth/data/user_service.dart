@@ -27,6 +27,8 @@ class UserService {
           openingBalanceAmount:
               (data['openingBalanceAmount'] as num?)?.toDouble() ?? 0,
           openingBalanceDate: _openingBalanceDate(data['openingBalanceDate']),
+          openingBalanceConfigured:
+              data['openingBalanceConfigured'] as bool? ?? false,
         );
       }
       return null;
@@ -49,6 +51,8 @@ class UserService {
           openingBalanceAmount:
               (data['openingBalanceAmount'] as num?)?.toDouble() ?? 0,
           openingBalanceDate: _openingBalanceDate(data['openingBalanceDate']),
+          openingBalanceConfigured:
+              data['openingBalanceConfigured'] as bool? ?? false,
         );
       }
       return null;

@@ -7,6 +7,7 @@ class AppUser {
   final DateTime createdAt;
   final double openingBalanceAmount;
   final DateTime openingBalanceDate;
+  final bool openingBalanceConfigured;
 
   AppUser({
     required this.uid,
@@ -17,6 +18,7 @@ class AppUser {
     required this.createdAt,
     this.openingBalanceAmount = 0,
     DateTime? openingBalanceDate,
+    this.openingBalanceConfigured = false,
   }) : openingBalanceDate = _dateOnly(openingBalanceDate ?? DateTime.now());
 
   Map<String, dynamic> toMap() {
@@ -28,6 +30,7 @@ class AppUser {
       'createdAt': createdAt,
       'openingBalanceAmount': openingBalanceAmount,
       'openingBalanceDate': openingBalanceDate,
+      'openingBalanceConfigured': openingBalanceConfigured,
     };
   }
 

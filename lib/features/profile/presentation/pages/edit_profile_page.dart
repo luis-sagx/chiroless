@@ -78,6 +78,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             _openingBalanceDate.month,
             _openingBalanceDate.day,
           ),
+          'openingBalanceConfigured': true,
         });
 
         // Update password if provided

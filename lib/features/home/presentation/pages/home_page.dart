@@ -568,6 +568,32 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               ],
                             ),
+                            if (appUser != null &&
+                                !appUser!.openingBalanceConfigured) ...[
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Configura el dinero que tenías al comenzar '
+                                'para calcular tu saldo disponible.',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                onPressed: _navigateToEditProfile,
+                                icon: const Icon(
+                                  Icons.account_balance_wallet_outlined,
+                                ),
+                                label: const Text('Configurar saldo inicial'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  side: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                 ),
