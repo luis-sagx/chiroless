@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import '../../../../core/services/firebase_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../models/income_model.dart';
+import '../../../../models/recurring_transaction_model.dart';
 import '../../data/transaction_service.dart';
+import '../../data/recurring_transaction_service.dart';
 import '../../../achievements/data/gamification_service.dart';
+import '../widgets/recurrence_form_fields.dart';
 
 class AddIncomePage extends StatefulWidget {
   final Income? income;
@@ -22,12 +25,16 @@ class _AddIncomePageState extends State<AddIncomePage> {
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _transactionService = TransactionService();
+  final _recurringTransactionService = RecurringTransactionService();
   final _firebaseService = FirebaseService();
   final _gamificationService = GamificationService();
 
   String _selectedSource = 'Salario';
   bool _isLoading = false;
   DateTime _selectedDate = DateTime.now();
+  bool _isRecurring = false;
+  RecurrenceFrequency _recurrenceFrequency = RecurrenceFrequency.monthly;
+  DateTime? _recurrenceEndDate;
 
   final List<String> _sources = TransactionCategories.incomeNames;
 
@@ -61,6 +68,14 @@ class _AddIncomePageState extends State<AddIncomePage> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
+        if (_recurrenceEndDate != null &&
+            DateTime(
+              _recurrenceEndDate!.year,
+              _recurrenceEndDate!.month,
+              _recurrenceEndDate!.day,
+            ).isBefore(DateTime(picked.year, picked.month, picked.day))) {
+          _recurrenceEndDate = null;
+        }
       });
     }
   }
@@ -81,10 +96,12 @@ class _AddIncomePageState extends State<AddIncomePage> {
         source: _selectedSource,
         description: _descriptionController.text.trim(),
         date: _selectedDate,
+        recurrenceId: widget.income?.recurrenceId,
+        recurrenceDate: widget.income?.recurrenceDate,
       );
 
       final saved = widget.income == null
-          ? await _transactionService.createIncome(income) != null
+          ? await _saveNewIncome(user.uid, income)
           : await _transactionService.updateIncome(income);
       if (!saved) throw Exception('No se pudo guardar el ingreso');
       if (widget.income == null) {
@@ -123,6 +140,32 @@ class _AddIncomePageState extends State<AddIncomePage> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<bool> _saveNewIncome(String userId, Income income) async {
+    if (!_isRecurring) {
+      return await _transactionService.createIncome(income) != null;
+    }
+    final seriesId = await _recurringTransactionService.createSeries(
+      RecurringTransaction(
+        userId: userId,
+        isExpense: false,
+        amount: income.amount,
+        category: income.source,
+        startDate: income.date,
+        frequency: _recurrenceFrequency,
+        endDate: _recurrenceEndDate,
+        description: income.description ?? '',
+      ),
+    );
+    if (seriesId == null) return false;
+    try {
+      await _recurringTransactionService.reconcileForUser(userId);
+    } catch (error) {
+      // The series is saved; the next app open will retry its due occurrences.
+      print('Error registrando primera ocurrencia del ingreso: $error');
+    }
+    return true;
   }
 
   @override
@@ -218,6 +261,28 @@ class _AddIncomePageState extends State<AddIncomePage> {
                   ],
                 ),
               ),
+
+              if (widget.income == null) ...[
+                const SizedBox(height: 12),
+                RecurrenceFormFields(
+                  enabled: _isRecurring,
+                  frequency: _recurrenceFrequency,
+                  startDate: _selectedDate,
+                  endDate: _recurrenceEndDate,
+                  onEnabledChanged: (value) =>
+                      setState(() => _isRecurring = value),
+                  onFrequencyChanged: (value) =>
+                      setState(() => _recurrenceFrequency = value),
+                  onEndDateChanged: (value) =>
+                      setState(() => _recurrenceEndDate = value),
+                ),
+              ] else if (widget.income?.recurrenceId != null) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Este movimiento pertenece a una serie. Los cambios solo afectan a este movimiento.',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
+              ],
 
               const SizedBox(height: 24),
 

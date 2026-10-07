@@ -25,6 +25,7 @@ import '../../../profile/presentation/pages/about_page.dart';
 import '../../../profile/presentation/pages/terms_conditions_page.dart';
 import '../../../ai_assistant/presentation/pages/ai_assistant_page.dart';
 import '../../../transactions/data/transaction_service.dart';
+import '../../../transactions/data/recurring_transaction_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../../../models/expense_model.dart';
 import '../../../../models/income_model.dart';
@@ -43,6 +44,7 @@ class _HomePageState extends State<HomePage> {
   final service = FirebaseService();
   final userService = UserService();
   final transactionService = TransactionService();
+  final _recurringTransactionService = RecurringTransactionService();
   final _budgetService = BudgetService();
   bool _widgetHidden = false;
   int _selectedIndex = 0;
@@ -60,7 +62,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     initializeDateFormatting('es', null);
-    _loadUser();
+    _loadUser(reconcileRecurring: true);
     ShortcutService.pending.addListener(_handleShortcut);
     WidgetsBinding.instance.addPostFrameCallback((_) => _handleShortcut());
     HomeWidgetService.isHidden().then((v) {
@@ -82,9 +84,17 @@ class _HomePageState extends State<HomePage> {
     _showAddTransactionOptions(isExpense: type != ShortcutService.addIncome);
   }
 
-  Future<void> _loadUser() async {
+  Future<void> _loadUser({bool reconcileRecurring = false}) async {
     final user = service.currentUser;
     if (user != null) {
+      if (reconcileRecurring) {
+        try {
+          await _recurringTransactionService.reconcileForUser(user.uid);
+        } catch (error) {
+          // A temporary Firestore error must not prevent the user entering Home.
+          print('Error conciliando movimientos periódicos: $error');
+        }
+      }
       final transactionsFuture = _loadTransactionData();
       final userData = await userService.getUser(user.uid);
       if (mounted) {

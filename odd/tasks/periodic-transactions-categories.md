@@ -24,7 +24,7 @@ Entrega: estrategia `single-pr`, siguiendo la decisión documentada para cambios
 
 ## Tareas
 
-- [ ] T1 Periodicidad: modelar series/ocurrencias, persistencia y reconciliación idempotente al iniciar sesión; conectar formularios. Ruta: delegada directa; evidencia: el flujo toca modelos, servicio Firestore, carga de sesión y dos formularios (>2 archivos no triviales). Verificación: pruebas de cálculo de fechas y deduplicación; `flutter test --no-pub`.
+- [ ] T1 Periodicidad: modelar series/ocurrencias, persistencia y reconciliación idempotente al iniciar sesión; conectar formularios. Ruta: delegada directa; evidencia: el flujo toca modelos, servicio Firestore, carga de sesión y dos formularios (>2 archivos no triviales). Implementación terminada; `flutter analyze --no-pub --no-fatal-infos` pasó (0 errores, 75 infos) y `git diff --check` pasó. Pruebas de cálculo/deduplicación no agregadas ni ejecutadas por instrucción del entorno; quedan como verificación pendiente.
 - [ ] T2 Categorías: persistir categorías por usuario, inicializar valores por defecto y añadir administración; sustituir las listas fijas en selección, extracción rápida y estadísticas. Ruta: delegada directa; evidencia: el mapa de CodeGraph encontró consumidores en más de cuatro archivos. Verificación: pruebas de mínimo una categoría, aislamiento de usuario, inicialización y selección dinámica; `flutter test --no-pub`.
 - [ ] T3 Acciones en Inicio: añadir menú contextual por pulsación larga con edición y borrado confirmado, refresco de datos y tratamiento de ocurrencias periódicas. Ruta: delegada directa; evidencia: Inicio, páginas de edición y servicio de transacciones son archivos no triviales distintos. Verificación: pruebas widget de acciones y regresión del listado; `flutter test --no-pub`.
 
@@ -32,5 +32,6 @@ Entrega: estrategia `single-pr`, siguiendo la decisión documentada para cambios
 
 - Exploración realizada con CodeGraph y mapeo delegado de solo lectura: los formularios de alta ya aceptan modelos existentes para editar; `TransactionService` tiene update/delete; Inicio limita las tarjetas recientes a cinco y no tiene gestos de edición/eliminación; categorías actuales son estáticas y usadas también por quick-add/extracción/estadísticas; no hay recurrencias implementadas.
 - Diseño aprobado por el usuario: registro automático de ocurrencias vencidas; categorías dinámicas por usuario con una mínima por tipo; acciones de Inicio mediante pulsación larga.
-- Especificación y plan escritos; pendientes de revisión del usuario. No se han modificado archivos de producto ni se han ejecutado pruebas.
-- Próximo paso: obtener aprobación de la especificación y continuar el plan task-by-task. El mirror Engram permanece pendiente.
+- El usuario indicó continuar directamente con la implementación, por lo que se omitió la revisión formal de la especificación.
+- T1 implementada por escritor delegado; cambios revisados mediante CodeGraph. Sin commit de implementación todavía. Las pruebas automatizadas siguen pendientes/no ejecutadas; no se marcará T1 como cerrada sin esa evidencia.
+- Próximo paso: implementar T2 (categorías) y T3 (acciones en Inicio), ejecutar los checks no relacionados con tests y documentar las verificaciones omitidas. El mirror Engram permanece pendiente.

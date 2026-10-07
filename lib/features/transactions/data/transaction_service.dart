@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/expense_model.dart';
 import '../../../models/income_model.dart';
+import 'recurring_transaction_service.dart';
 
 class TransactionService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -83,7 +84,18 @@ class TransactionService {
   /// Eliminar un gasto
   Future<bool> deleteExpense(String expenseId) async {
     try {
-      await _db.collection('expenses').doc(expenseId).delete();
+      final reference = _db.collection('expenses').doc(expenseId);
+      final snapshot = await reference.get();
+      final data = snapshot.data();
+      final recurrenceId = data?['recurrenceId'] as String?;
+      final recurrenceDate = data?['recurrenceDate'] as String?;
+      if (recurrenceId != null && recurrenceDate != null) {
+        await RecurringTransactionService().skipOccurrence(
+          seriesId: recurrenceId,
+          occurrenceDate: recurrenceDate,
+        );
+      }
+      await reference.delete();
       return true;
     } catch (e) {
       print('Error eliminando gasto: $e');
@@ -188,7 +200,18 @@ class TransactionService {
   /// Eliminar un ingreso
   Future<bool> deleteIncome(String incomeId) async {
     try {
-      await _db.collection('incomes').doc(incomeId).delete();
+      final reference = _db.collection('incomes').doc(incomeId);
+      final snapshot = await reference.get();
+      final data = snapshot.data();
+      final recurrenceId = data?['recurrenceId'] as String?;
+      final recurrenceDate = data?['recurrenceDate'] as String?;
+      if (recurrenceId != null && recurrenceDate != null) {
+        await RecurringTransactionService().skipOccurrence(
+          seriesId: recurrenceId,
+          occurrenceDate: recurrenceDate,
+        );
+      }
+      await reference.delete();
       return true;
     } catch (e) {
       print('Error eliminando ingreso: $e');
