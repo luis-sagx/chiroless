@@ -9,6 +9,7 @@
 - TDD: deshabilitado según configuración previa registrada en `odd/tasks/claridad-financiera.md`; runner del proyecto `flutter test --no-pub` (no ejecutar ni añadir pruebas automatizadas sin petición explícita). Checks aplicables: `flutter analyze --no-pub --no-fatal-infos`, `flutter build apk --debug --no-pub`, `git diff --check`.
 - Ruta: delegada. Evidencia: el cambio requiere coordinar el modelo y lectura/escritura de perfil, formulario de perfil, consulta/cálculo de Inicio y comprobaciones (4+ archivos); el disparador de escritor aplica al tocar 2+ archivos no triviales. Mapeo de solo lectura delegado a `/root/opening_balance_mapping`.
 - Estrategia de entrega: `ask-on-risk` (por defecto). Forecast inicial: ~250 líneas editadas; commit de trabajo `2ea7ca1` registró 238 líneas añadidas/eliminadas (incluye el documento de tarea), por debajo del umbral de entrega.
+- RDD: `gentle-ai review mode status` no está disponible (`gentle-ai` no está instalado en esta sesión); no se ejecutó una revisión nativa. Sin confirmación de modo no se reclama autorización ni resultado de review.
 
 ## Tareas
 
