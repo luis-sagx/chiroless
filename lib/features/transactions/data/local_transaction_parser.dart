@@ -14,12 +14,26 @@ class LocalTransactionParser {
   );
   static final RegExp _wordSplit = RegExp(r'[^a-záéíóúñü]+');
 
+  static const Set<String> _dollarUnits = {
+    'dólar', 'dólares', 'dolar', 'dolares', 'usd',
+  };
+  static const Set<String> _centUnits = {'centavo', 'centavos'};
+  static const Set<String> _otherCurrencyUnits = {
+    'euro', 'euros', 'peso', 'pesos', 'sol', 'soles', 'libra', 'libras',
+    'yen', 'yenes', 'franco', 'francos', 'real', 'reales', 'rublo', 'rublos',
+    'yuan', 'yuanes', 'won', 'colón', 'colones', 'bolívar', 'bolívares',
+    'bolivar', 'bolivares',
+  };
+
   static const Set<String> _dateWords = {'hoy', 'ayer', 'anteayer'};
 
   static const Set<String> _incomeTriggers = {
     'recibí', 'recibi', 'cobré', 'cobre', 'ingreso', 'ingresó',
     'pagaron', 'depositaron', 'transfirieron', 'gané', 'gane',
+    'encontré', 'encontre',
   };
+
+  static const Set<String> _foundMoneyTriggers = {'encontré', 'encontre'};
 
   static const Set<String> _expenseTriggers = {
     'compré', 'compre', 'pagué', 'pague', 'gasté', 'gaste',
@@ -93,17 +107,38 @@ class LocalTransactionParser {
         (tokens.any(_incomeTriggers.contains) ||
             _findCategory(tokens, _incomeKeywords) != null ||
             _findNamedCategory(tokens, incomes) != null);
-    final category = _findCategory(
-      tokens,
-      isIncome ? _incomeKeywords : _expenseKeywords,
-    ) ?? _findNamedCategory(tokens, isIncome ? incomes : expenses);
+    final category =
+        _findCategory(tokens, isIncome ? _incomeKeywords : _expenseKeywords) ??
+        _findNamedCategory(tokens, isIncome ? incomes : expenses) ??
+        (isIncome && tokens.any(_foundMoneyTriggers.contains)
+            ? 'Otros'
+            : null);
 
-    final match = _amountPattern.firstMatch(text);
+    final matches = _amountPattern.allMatches(text).toList();
+    final hasOtherCurrency = tokens.any(_otherCurrencyUnits.contains);
+    final hasCentUnit = tokens.any(_centUnits.contains);
     double? amount;
-    if (match != null) {
-      final whole = match.group(1)!.replaceAll(RegExp(r'[.,]'), '');
-      final decimals = match.group(2);
-      amount = double.parse(decimals == null ? whole : '$whole.$decimals');
+    if (!hasOtherCurrency && matches.isNotEmpty) {
+      if (hasCentUnit) {
+        var dollars = 0.0;
+        var cents = 0.0;
+        for (var i = 0; i < matches.length; i++) {
+          final match = matches[i];
+          final end = i + 1 < matches.length
+              ? matches[i + 1].start
+              : text.length;
+          final followingWords = _tokens(text.substring(match.end, end));
+          final value = _parseAmount(match);
+          if (followingWords.any(_centUnits.contains)) {
+            cents += value;
+          } else if (followingWords.any(_dollarUnits.contains)) {
+            dollars += value;
+          }
+        }
+        amount = dollars + cents / 100;
+      } else {
+        amount = _parseAmount(matches.first);
+      }
     }
 
     var daysAgo = 0;
@@ -123,7 +158,20 @@ class LocalTransactionParser {
           );
 
     var rest = text;
-    if (match != null) rest = rest.replaceFirst(match.group(0)!, ' ');
+    if (matches.isNotEmpty && !hasOtherCurrency) {
+      for (final match in matches) {
+        rest = rest.replaceFirst(match.group(0)!, ' ');
+      }
+      if (hasCentUnit || tokens.any(_dollarUnits.contains)) {
+        rest = rest.replaceAll(
+          RegExp(
+            r'\b(?:dólares?|dolares?|usd|centavos?)\b',
+            caseSensitive: false,
+          ),
+          ' ',
+        );
+      }
+    }
     final description = rest
         .replaceAll('\$', ' ')
         .split(RegExp(r'\s+'))
@@ -137,6 +185,12 @@ class LocalTransactionParser {
       description: description,
       date: date,
     );
+  }
+
+  static double _parseAmount(RegExpMatch match) {
+    final whole = match.group(1)!.replaceAll(RegExp(r'[.,]'), '');
+    final decimals = match.group(2);
+    return double.parse(decimals == null ? whole : '$whole.$decimals');
   }
 
   static String? _findCategory(
