@@ -38,7 +38,7 @@ After startup, `SplashScreen` replaces itself with either `HomePage` or `LoginPa
   - Route: delegated direct.
   - Outcome: added `lib/shared/widgets/double_back_to_exit.dart` and connected it to the app navigator in `lib/main.dart`. Android root Back is consumed, a second press within two seconds exits, and nested route Back is passed through.
   - Verification: `dart format lib/main.dart lib/shared/widgets/double_back_to_exit.dart` reported no changes. `git diff --check` passed. `flutter analyze lib/main.dart lib/shared/widgets/double_back_to_exit.dart` exited 1 on two existing `avoid_print` infos in `lib/main.dart` lines 45 and 53; the new widget had no analyzer findings. Tests were not added or run under the higher-priority instruction.
-  - Review/delivery: native RDD unavailable because `gentle-ai` is not installed; no review or approval is claimed. Work-unit commit pending.
+  - Review/delivery: native RDD unavailable because `gentle-ai` is not installed; no review or approval is claimed. Work-unit commit: `ecf22fa` (`feat(navigation): require double back to exit at root`) on `main`.
 
 ## Verification evidence
 
@@ -48,4 +48,4 @@ After startup, `SplashScreen` replaces itself with either `HomePage` or `LoginPa
 
 ## Next step
 
-Record the work-unit commit identity, then synchronize the Engram mirror if a memory tool becomes available.
+Synchronize the Engram mirror if a memory tool becomes available.
