@@ -21,4 +21,5 @@ Previsión: ~30 líneas añadidas/eliminadas; una tarea, por debajo del presupue
 - Exploración: `main.dart` inicializa Firebase y App Check; Android release está firmado con `signingConfigs.debug`; `.gitignore` excluye `*.jks` y `keystore.properties`. El usuario autorizó configurar el firmado y generar el APK.
 - `gentle-ai review mode status` no está disponible (`gentle-ai: command not found`); RDD no se ejecutará ni se inferirá un resultado.
 - Espejo Engram: pendiente, no hay herramientas de memoria disponibles en esta sesión.
-- Próximo paso: crear el commit de trabajo en esta rama y registrar su identidad aquí.
+- Commit de trabajo: `7b72c71` (`build(android): sign release apk with local keystore`). Evaluación RDD: unavailable; `gentle-ai review assess` no pudo ejecutarse porque el binario no está instalado. No se atribuye nivel de riesgo ni aprobación.
+- Próximo paso: registrar el paquete y el SHA-256 del certificado en Firebase App Check / Play Integrity; después compartir `build/app/outputs/flutter-apk/app-release.apk`. El espejo Engram sigue pendiente.
