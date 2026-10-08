@@ -29,6 +29,31 @@ void main() {
     expect(d.category, 'Transporte');
   });
 
+  test('interpreta centavos como fracción de dólar', () {
+    final d = LocalTransactionParser.parse('50 centavos', now: now);
+    expect(d.amount, 0.5);
+  });
+
+  test('interpreta dólares como monto completo', () {
+    final d = LocalTransactionParser.parse('50 dólares', now: now);
+    expect(d.amount, 50.0);
+  });
+
+  test('interpreta dólares y centavos en una frase', () {
+    final d = LocalTransactionParser.parse('1 dólar con 50 centavos', now: now);
+    expect(d.amount, 1.5);
+  });
+
+  test('conserva el monto decimal sin unidad', () {
+    final d = LocalTransactionParser.parse('0.5', now: now);
+    expect(d.amount, 0.5);
+  });
+
+  test('no interpreta otras monedas como dólares', () {
+    final d = LocalTransactionParser.parse('50 euros', now: now);
+    expect(d.amount, isNull);
+  });
+
   test('ingreso por verbo y categoría', () {
     final d = LocalTransactionParser.parse('recibí 450 sueldo', now: now);
     expect(d.isExpense, isFalse);

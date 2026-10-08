@@ -40,7 +40,13 @@ class TransactionExtractionService {
     final expenses = expenseCategories ?? TransactionCategories.expenseNames;
     final incomes = incomeCategories ?? TransactionCategories.incomeNames;
     final prompt =
-        '${_instructions(expenses, incomes)}\nTexto del usuario: """$text"""';
+        '${_instructions(expenses, incomes)}\n'
+        'Al interpretar el monto del texto, convierte centavos a fracciones de '
+        'dólar: "50 centavos" = 0.50, "50 dólares" = 50 y "1 dólar con '
+        '50 centavos" = 1.50. Un número sin unidad, como "0.5", conserva su '
+        'valor decimal. Si se menciona otra moneda (por ejemplo, euros o '
+        'pesos), no la conviertas a dólares y omite amount.\n'
+        'Texto del usuario: """$text"""';
     return _run([Content.text(prompt)], expenses, incomes);
   }
 
