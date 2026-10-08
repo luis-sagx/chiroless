@@ -10,6 +10,7 @@ import 'core/config/env_config.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/shortcut_service.dart';
 import 'features/home/presentation/pages/splash_screen.dart';
+import 'shared/widgets/double_back_to_exit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,13 +57,20 @@ Future<void> _initShortcuts() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  static final _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Chiroless',
       theme: AppTheme.lightTheme,
       home: const SplashScreen(),
+      builder: (context, child) => DoubleBackToExit(
+        navigatorKey: _navigatorKey,
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }
