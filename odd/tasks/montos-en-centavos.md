@@ -18,7 +18,7 @@ RDD: el ejecutable `gentle-ai` no está disponible en este entorno; evaluación 
 
 ## Tareas
 
-- [x] C1 Normalizar unidades monetarias en el parser local y en la extracción IA; agregar pruebas de parser para expresiones simples, mixtas y decimales. Ruta: delegada (writer trigger: la implementación abarca parser, servicio IA y pruebas, tres archivos no triviales). TDD efectivo: off; runner registrado: `flutter test --no-pub`. La regla para IA se agregó solo a `fromText`, sin cambiar el flujo de imágenes. Verificación del padre: `flutter test --no-pub` pasó (53 pruebas); `flutter analyze --no-pub --no-fatal-infos` salió correctamente (82 avisos informativos, sin errores ni advertencias); `git diff --check` limpio. Prueba focalizada reportada por el writer: 16 pruebas pasaron. Commit de implementación pendiente.
+- [x] C1 Normalizar unidades monetarias en el parser local y en la extracción IA; agregar pruebas de parser para expresiones simples, mixtas y decimales. Ruta: delegada (writer trigger: la implementación abarca parser, servicio IA y pruebas, tres archivos no triviales). TDD efectivo: off; runner registrado: `flutter test --no-pub`. La regla para IA se agregó solo a `fromText`, sin cambiar el flujo de imágenes. Verificación del padre: `flutter test --no-pub` pasó (53 pruebas); `flutter analyze --no-pub --no-fatal-infos` salió correctamente (82 avisos informativos, sin errores ni advertencias); `git diff --check` limpio. Prueba focalizada reportada por el writer: 16 pruebas pasaron. Commit de implementación: `ae0b0f6`.
 
 ## Progreso y evidencia
 
@@ -27,7 +27,7 @@ RDD: el ejecutable `gentle-ai` no está disponible en este entorno; evaluación 
 
 ## Próximo paso
 
-- Registrar el commit de implementación en esta tarea y completar el commit local.
+- Validar en un dispositivo que el reconocimiento de voz produzca texto que el parser interprete según estas reglas; el comportamiento lógico está cubierto por las pruebas, pero no se hizo una prueba física de micrófono.
 
 ## Espejo Engram
 
