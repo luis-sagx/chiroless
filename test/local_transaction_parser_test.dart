@@ -61,6 +61,14 @@ void main() {
     expect(d.category, 'Salario');
   });
 
+  test('dinero encontrado se clasifica como ingreso en Otros', () {
+    final d = LocalTransactionParser.parse('me encontré 10 dólares', now: now);
+    expect(d.amount, 10.0);
+    expect(d.isExpense, isFalse);
+    expect(d.category, 'Otros');
+    expect(d.isComplete, isTrue);
+  });
+
   test('separador de miles y símbolo de dólar', () {
     final d = LocalTransactionParser.parse('\$1.500 arriendo', now: now);
     expect(d.amount, 1500.0);

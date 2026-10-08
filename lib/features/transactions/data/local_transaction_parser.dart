@@ -30,7 +30,10 @@ class LocalTransactionParser {
   static const Set<String> _incomeTriggers = {
     'recibí', 'recibi', 'cobré', 'cobre', 'ingreso', 'ingresó',
     'pagaron', 'depositaron', 'transfirieron', 'gané', 'gane',
+    'encontré', 'encontre',
   };
+
+  static const Set<String> _foundMoneyTriggers = {'encontré', 'encontre'};
 
   static const Set<String> _expenseTriggers = {
     'compré', 'compre', 'pagué', 'pague', 'gasté', 'gaste',
@@ -104,10 +107,12 @@ class LocalTransactionParser {
         (tokens.any(_incomeTriggers.contains) ||
             _findCategory(tokens, _incomeKeywords) != null ||
             _findNamedCategory(tokens, incomes) != null);
-    final category = _findCategory(
-      tokens,
-      isIncome ? _incomeKeywords : _expenseKeywords,
-    ) ?? _findNamedCategory(tokens, isIncome ? incomes : expenses);
+    final category =
+        _findCategory(tokens, isIncome ? _incomeKeywords : _expenseKeywords) ??
+        _findNamedCategory(tokens, isIncome ? incomes : expenses) ??
+        (isIncome && tokens.any(_foundMoneyTriggers.contains)
+            ? 'Otros'
+            : null);
 
     final matches = _amountPattern.allMatches(text).toList();
     final hasOtherCurrency = tokens.any(_otherCurrencyUnits.contains);
