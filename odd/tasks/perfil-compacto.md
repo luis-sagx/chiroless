@@ -21,4 +21,5 @@
 
 - Diseño aprobado por el usuario: cabecera horizontal compacta, opciones agrupadas y quitar “Acerca de”.
 - Espejo Engram pendiente por falta de herramientas.
-- P1 completada y lista para commit; registrar su identidad en el documento tras crear el commit.
+- P1 completada en el commit de trabajo `a13fddb` (`feat(profile): compact and organize profile screen`).
+- Siguiente paso: ninguno para la implementación; el espejo Engram queda pendiente por falta de herramienta.
