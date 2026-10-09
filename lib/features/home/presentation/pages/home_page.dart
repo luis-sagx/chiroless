@@ -25,8 +25,8 @@ import '../../../achievements/data/gamification_service.dart';
 import '../../../achievements/presentation/widgets/reward_feedback.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../profile/presentation/pages/edit_profile_page.dart';
+import '../../../profile/presentation/pages/opening_balance_page.dart';
 import '../../../profile/presentation/pages/help_page.dart';
-import '../../../profile/presentation/pages/about_page.dart';
 import '../../../profile/presentation/pages/terms_conditions_page.dart';
 import '../../../ai_assistant/presentation/pages/ai_assistant_page.dart';
 import '../../../transactions/data/transaction_service.dart';
@@ -301,6 +301,16 @@ class _HomePageState extends State<HomePage> {
     );
     if (result == true) {
       _loadUser(); // Reload to update user data
+    }
+  }
+
+  Future<void> _navigateToOpeningBalance() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const OpeningBalancePage()),
+    );
+    if (result == true) {
+      _loadUser(); // Reload to update the balance
     }
   }
 
@@ -754,160 +764,186 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildProfileContent() {
     final user = service.currentUser;
+    final name = appUser?.name.trim().isNotEmpty == true
+        ? appUser!.name.trim()
+        : user?.email?.split('@').first ?? 'Usuario';
+    final email = user?.email ?? '';
+    final initial = name.isNotEmpty
+        ? name[0].toUpperCase()
+        : (email.isNotEmpty ? email[0].toUpperCase() : 'U');
 
     return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'Perfil',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 20),
-            Text('Perfil', style: Theme.of(context).textTheme.displayMedium),
-            const SizedBox(height: 32),
-
-            // Profile Card
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: AppTheme.cardGradient,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 5),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: Column(
+              child: Row(
                 children: [
                   Container(
-                    width: 80,
-                    height: 80,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
                       gradient: AppTheme.primaryGradient,
                       shape: BoxShape.circle,
                     ),
                     child: Center(
                       child: Text(
-                        appUser?.name.isNotEmpty == true
-                            ? appUser!.name[0].toUpperCase()
-                            : (user?.email?[0].toUpperCase() ?? 'U'),
+                        initial,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 32,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    appUser?.name ?? user?.email?.split('@')[0] ?? 'Usuario',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    user?.email ?? '',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      appUser?.level ?? 'Principiante',
-                      style: TextStyle(
-                        color: AppTheme.primaryColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        if (email.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            email,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: AppTheme.textSecondary),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            appUser?.level ?? 'Principiante',
+                            style: TextStyle(
+                              color: AppTheme.primaryColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 32),
-
-            // Menu Items
-            if (user?.email == dotenv.env['ADMIN_EMAIL'])
-              _buildMenuItem(Icons.analytics, 'Panel Investigador', () {
+            const SizedBox(height: 24),
+            _buildProfileSection('Cuenta', [
+              if (user?.email == dotenv.env['ADMIN_EMAIL'])
+                _buildMenuItem(Icons.analytics, 'Panel Investigador', () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AdminPage()),
+                  );
+                }),
+              _buildMenuItem(
+                Icons.person_outline,
+                'Editar perfil',
+                _navigateToEditProfile,
+              ),
+              _buildMenuItem(
+                Icons.account_balance_wallet_outlined,
+                'Saldo inicial',
+                _navigateToOpeningBalance,
+              ),
+              _buildMenuItem(
+                Icons.category_outlined,
+                'Administrar categorías',
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CategoryManagementPage(),
+                    ),
+                  );
+                },
+              ),
+            ]),
+            if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
+              const SizedBox(height: 20),
+              _buildProfileSection('Preferencias', [
+                _buildMenuItem(
+                  Icons.visibility_off_outlined,
+                  'Ocultar montos en widget',
+                  () => _setWidgetHidden(!_widgetHidden),
+                  trailing: Switch(
+                    value: _widgetHidden,
+                    onChanged: _setWidgetHidden,
+                    activeThumbColor: AppTheme.primaryColor,
+                  ),
+                ),
+              ]),
+            ],
+            const SizedBox(height: 20),
+            _buildProfileSection('Ayuda', [
+              _buildMenuItem(Icons.help_outline, 'Centro de ayuda', () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const AdminPage()),
+                  MaterialPageRoute(builder: (context) => const HelpPage()),
                 );
               }),
-
-            _buildMenuItem(
-              Icons.person_outline,
-              'Editar perfil',
-              _navigateToEditProfile,
-            ),
-            _buildMenuItem(
-              Icons.category_outlined,
-              'Administrar categorías',
-              () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CategoryManagementPage(),
-                  ),
-                );
-              },
-            ),
-            _buildMenuItem(Icons.help_outline, 'Ayuda', () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const HelpPage()),
-              );
-            }),
-            _buildMenuItem(Icons.info_outline, 'Acerca de', () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AboutPage()),
-              );
-            }),
-            _buildMenuItem(
-              Icons.description_outlined,
-              'Términos y condiciones',
-              () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TermsConditionsPage(),
-                  ),
-                );
-              },
-            ),
-            if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+            ]),
+            const SizedBox(height: 20),
+            _buildProfileSection('Legal', [
               _buildMenuItem(
-                Icons.visibility_off_outlined,
-                'Ocultar montos en widget',
-                () => _setWidgetHidden(!_widgetHidden),
-                trailing: Switch(
-                  value: _widgetHidden,
-                  onChanged: _setWidgetHidden,
-                  activeThumbColor: AppTheme.primaryColor,
-                ),
+                Icons.description_outlined,
+                'Términos y condiciones',
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TermsConditionsPage(),
+                    ),
+                  );
+                },
               ),
-
-            const SizedBox(height: 16),
-
-            // Logout Button
+            ]),
+            const SizedBox(height: 20),
             InkWell(
               onTap: _logout,
               borderRadius: BorderRadius.circular(16),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 16,
+                  vertical: 14,
                 ),
                 decoration: BoxDecoration(
                   color: AppTheme.errorColor.withValues(alpha: 0.1),
@@ -915,13 +951,13 @@ class _HomePageState extends State<HomePage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.logout, color: AppTheme.errorColor, size: 24),
-                    const SizedBox(width: 16),
+                    Icon(Icons.logout, color: AppTheme.errorColor, size: 22),
+                    const SizedBox(width: 14),
                     Text(
                       'Cerrar sesión',
                       style: TextStyle(
                         color: AppTheme.errorColor,
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -932,6 +968,45 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildProfileSection(String title, List<Widget> items) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              for (var index = 0; index < items.length; index++) ...[
+                items[index],
+                if (index < items.length - 1)
+                  Divider(
+                    height: 1,
+                    indent: 56,
+                    endIndent: 16,
+                    color: AppTheme.textSecondary.withValues(alpha: 0.12),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1233,22 +1308,17 @@ class _HomePageState extends State<HomePage> {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, color: AppTheme.textPrimary, size: 24),
-            const SizedBox(width: 16),
+            Icon(icon, color: AppTheme.textPrimary, size: 22),
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1257,7 +1327,7 @@ class _HomePageState extends State<HomePage> {
                 Icon(
                   Icons.chevron_right,
                   color: AppTheme.textSecondary,
-                  size: 24,
+                  size: 22,
                 ),
           ],
         ),
