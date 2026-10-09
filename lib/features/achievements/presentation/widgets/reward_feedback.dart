@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../../data/gamification_service.dart';
+import 'mission_celebrations.dart';
 
 /// Financial persistence has already succeeded when this helper is used.
 /// A timeout does not cancel a Firestore write; streams can confirm it later.
@@ -27,7 +28,8 @@ Future<void> refreshAchievements(
   String uid,
 ) async {
   try {
-    await service.checkAndUnlockAchievements(uid);
+    final unlocked = await service.checkAndUnlockAchievements(uid);
+    MissionCelebrations.instance.publish(uid, unlocked);
   } catch (_) {
     /* Streams and next registration can retry the check. */
   }

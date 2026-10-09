@@ -1,15 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../models/achievement_model.dart';
 import '../../data/gamification_rules.dart';
 import '../../data/gamification_service.dart';
+import 'joyful_celebration.dart';
+import 'mission_celebrations.dart';
 
-/// Lives in the authenticated shell so all tabs share one celebration queue.
+/// One authenticated shell owns deferred and combined reward presentation.
 class GamificationSession extends StatefulWidget {
+  final String? userId;
   final int? points;
   final Future<RewardResult> Function() onDailyVisit;
   final Widget child;
   const GamificationSession({
     super.key,
+    this.userId,
     required this.points,
     required this.onDailyVisit,
     required this.child,
@@ -21,47 +26,106 @@ class GamificationSession extends StatefulWidget {
 class _GamificationSessionState extends State<GamificationSession>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _animation;
+  StreamSubscription<String>? _missionSubscription;
   int? _highestLevel;
   int? _pendingLevel;
   int? _celebratingLevel;
-  String? _dailyFeedback;
+  int _previousPoints = 0;
+  int? _confirmedDailyTotal;
+  List<Achievement> _missions = [];
+  int _pendingDaily = 0;
+  int _celebrationDaily = 0;
+  int _bannerPoints = 0;
   Timer? _hideTimer;
+  Timer? _coalesceTimer;
+  bool _ready = false;
   bool _dailyInFlight = false;
   bool _active = true;
+  int _sessionEpoch = 0;
+  bool get _hasCard => _missions.isNotEmpty || _celebratingLevel != null;
+  List<Achievement> get _pendingMissions => widget.userId == null
+      ? const []
+      : MissionCelebrations.instance.pending(widget.userId!);
 
   @override
   void initState() {
     super.initState();
     _animation = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 450),
+      duration: const Duration(milliseconds: 800),
     );
     WidgetsBinding.instance.addObserver(this);
     _active =
         WidgetsBinding.instance.lifecycleState == null ||
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    _bindMissions();
     _observePoints();
+  }
+
+  void _bindMissions() {
+    _missionSubscription = MissionCelebrations.instance.changes.listen((uid) {
+      if (uid == widget.userId && mounted) _queuePresentation();
+    });
+    if (_pendingMissions.isNotEmpty) _queuePresentation();
   }
 
   @override
   void didUpdateWidget(covariant GamificationSession oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.points != widget.points) _observePoints();
+    if (oldWidget.userId != widget.userId) {
+      _sessionEpoch++;
+      _missionSubscription?.cancel();
+      _hideTimer?.cancel();
+      _coalesceTimer?.cancel();
+      _highestLevel = null;
+      _pendingLevel = _celebratingLevel = null;
+      _confirmedDailyTotal = null;
+      _missions = [];
+      _pendingDaily = _celebrationDaily = _bannerPoints = 0;
+      _dailyInFlight = _ready = false;
+      _animation.stop();
+      _bindMissions();
+    }
+    if (oldWidget.points != widget.points ||
+        oldWidget.userId != widget.userId) {
+      _previousPoints = oldWidget.userId == widget.userId
+          ? oldWidget.points ?? widget.points ?? 0
+          : widget.points ?? 0;
+      _confirmedDailyTotal = null;
+      _observePoints();
+    }
   }
 
-  void _observePoints() {
-    final points = widget.points;
-    if (points == null) return;
+  void _trackLevel(int points) {
     final level = GamificationRules.levelForPoints(points);
     if (_highestLevel == null) {
       _highestLevel = level;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) unawaited(_dailyVisit());
-      });
     } else if (level > _highestLevel!) {
       _highestLevel = level;
       _pendingLevel = level;
+      _queuePresentation();
     }
+  }
+
+  void _observePoints() {
+    if (widget.points == null) return;
+    final initial = _highestLevel == null;
+    _trackLevel(widget.points!);
+    if (initial) {
+      _previousPoints = widget.points!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_dailyVisit());
+      });
+    }
+  }
+
+  void _queuePresentation() {
+    _coalesceTimer?.cancel();
+    _ready = false;
+    // The points snapshot can arrive just before its committed unlock result.
+    _coalesceTimer = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) setState(() => _ready = true);
+    });
   }
 
   @override
@@ -74,115 +138,106 @@ class _GamificationSessionState extends State<GamificationSession>
   Future<void> _dailyVisit() async {
     if (!_active || widget.points == null || _dailyInFlight) return;
     _dailyInFlight = true;
+    final epoch = _sessionEpoch;
     try {
       final reward = await widget.onDailyVisit();
-      if (mounted && reward.confirmed && reward.pointsAwarded > 0) {
-        setState(
-          () => _dailyFeedback =
-              'Revisión diaria: +${reward.pointsAwarded} puntos',
-        );
+      if (mounted &&
+          epoch == _sessionEpoch &&
+          reward.confirmed &&
+          reward.pointsAwarded > 0) {
+        _pendingDaily += reward.pointsAwarded;
+        _confirmedDailyTotal = reward.totalPoints > (widget.points ?? 0)
+            ? reward.totalPoints
+            : null;
+        _trackLevel(reward.totalPoints);
+        _queuePresentation();
       }
     } catch (_) {
-      // A later resume retries; never show a reward before its confirmation.
+      // Retry on a later visit; an unconfirmed reward never gets a celebration.
     } finally {
-      _dailyInFlight = false;
+      if (epoch == _sessionEpoch) _dailyInFlight = false;
     }
   }
 
   void _showPending() {
-    if (!mounted || !_active || !(ModalRoute.isCurrentOf(context) ?? true)) {
+    if (!mounted ||
+        widget.points == null ||
+        !_ready ||
+        !_active ||
+        !(ModalRoute.isCurrentOf(context) ?? true)) {
       return;
     }
-    if (_dailyFeedback != null) {
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text(_dailyFeedback!)));
-      _dailyFeedback = null;
-    }
-    if (_pendingLevel == null) return;
+    final missions = _pendingMissions;
+    _ready = false;
+    if (missions.isEmpty && _pendingLevel == null && _pendingDaily == 0) return;
     _hideTimer?.cancel();
     setState(() {
-      _celebratingLevel = _pendingLevel;
+      if (missions.isNotEmpty || _pendingLevel != null || _hasCard) {
+        _missions = [..._missions, ...missions];
+        _celebratingLevel = _pendingLevel ?? _celebratingLevel;
+        _celebrationDaily += _pendingDaily + _bannerPoints;
+        _bannerPoints = 0;
+      } else {
+        _bannerPoints = _pendingDaily;
+      }
       _pendingLevel = null;
+      _pendingDaily = 0;
     });
+    if (widget.userId != null) {
+      MissionCelebrations.instance.acknowledge(widget.userId!, missions);
+    }
     if (MediaQuery.disableAnimationsOf(context)) {
       _animation.value = 1;
     } else {
       _animation.forward(from: 0);
     }
-    _hideTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _celebratingLevel = null);
-    });
+    _hideTimer = Timer(
+      Duration(
+        seconds: 4 + (_missions.isEmpty ? 0 : (_missions.length - 1) * 2),
+      ),
+      () {
+        if (mounted) {
+          setState(() {
+            _missions = [];
+            _celebratingLevel = null;
+            _celebrationDaily = _bannerPoints = 0;
+          });
+        }
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final visible = _active && (ModalRoute.isCurrentOf(context) ?? true);
-    if (visible && (_pendingLevel != null || _dailyFeedback != null)) {
+    if (visible && _ready) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _showPending());
     }
     return Stack(
+      fit: StackFit.expand,
       children: [
         widget.child,
-        if (visible && _celebratingLevel != null)
+        if (visible && _hasCard)
           Positioned.fill(
-            child: IgnorePointer(
-              child: Center(
-                child: FadeTransition(
-                  opacity: _animation,
-                  child: ScaleTransition(
-                    scale: Tween<double>(begin: .7, end: 1).animate(
-                      CurvedAnimation(
-                        parent: _animation,
-                        curve: Curves.easeOutBack,
-                      ),
-                    ),
-                    child: Semantics(
-                      liveRegion: true,
-                      child: Container(
-                        margin: const EdgeInsets.all(24),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 28,
-                          vertical: 24,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black26, blurRadius: 20),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.auto_awesome,
-                              color: Colors.amber,
-                              size: 48,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              '¡Subiste al nivel $_celebratingLevel!',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Tu constancia suma. ¡Sigue avanzando!',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+            child: Center(
+              child: JoyfulCelebration(
+                missions: _missions,
+                level: _celebratingLevel,
+                points: _confirmedDailyTotal ?? widget.points ?? 0,
+                previousPoints: _previousPoints,
+                dailyPoints: _celebrationDaily,
+                animation: _animation,
+                reducedMotion: MediaQuery.disableAnimationsOf(context),
               ),
+            ),
+          ),
+        if (visible && !_hasCard && _bannerPoints > 0)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: DailyRewardBanner(points: _bannerPoints),
             ),
           ),
       ],
@@ -192,7 +247,10 @@ class _GamificationSessionState extends State<GamificationSession>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _sessionEpoch++;
+    _missionSubscription?.cancel();
     _hideTimer?.cancel();
+    _coalesceTimer?.cancel();
     _animation.dispose();
     super.dispose();
   }

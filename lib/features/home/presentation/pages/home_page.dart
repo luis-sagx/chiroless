@@ -19,6 +19,7 @@ import '../../../transactions/presentation/pages/transactions_page.dart';
 import '../../../analytics/presentation/pages/statistics_page.dart';
 import '../../../achievements/presentation/pages/achievements_page.dart';
 import '../../../achievements/presentation/widgets/gamification_session.dart';
+import '../../../achievements/presentation/widgets/savings_leaderboard_sync.dart';
 import '../../../achievements/presentation/widgets/compact_level_indicator.dart';
 import '../../../achievements/data/gamification_service.dart';
 import '../../../achievements/presentation/widgets/reward_feedback.dart';
@@ -374,23 +375,29 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final userId = service.currentUser?.uid;
+    final content = GamificationSession(
+      userId: userId,
+      points: appUser?.points,
+      onDailyVisit: () => userId == null
+          ? Future.value(const RewardResult(confirmed: false))
+          : GamificationService().rewardDailyVisit(userId),
+      child: LazyIndexedStack(
+        index: _selectedIndex,
+        builders: [
+          (_) => _buildHomeContent(),
+          (_) => StatisticsPage(refreshListenable: _dataVersion),
+          (_) => const SizedBox.shrink(), // Placeholder for center button
+          (_) => const AchievementsPage(),
+          (_) => _buildProfileContent(),
+        ],
+      ),
+    );
     return Scaffold(
       body: SafeArea(
-        child: GamificationSession(
-          points: appUser?.points,
-          onDailyVisit: () =>
-              GamificationService().rewardDailyVisit(service.currentUser!.uid),
-          child: LazyIndexedStack(
-            index: _selectedIndex,
-            builders: [
-              (_) => _buildHomeContent(),
-              (_) => StatisticsPage(refreshListenable: _dataVersion),
-              (_) => const SizedBox.shrink(), // Placeholder for center button
-              (_) => const AchievementsPage(),
-              (_) => _buildProfileContent(),
-            ],
-          ),
-        ),
+        child: userId == null
+            ? content
+            : SavingsLeaderboardSync(userId: userId, child: content),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {

@@ -13,6 +13,7 @@ import '../../../transactions/data/transaction_service.dart';
 import '../../data/gamification_service.dart';
 import '../../data/gamification_rules.dart';
 import '../widgets/personal_progress_card.dart';
+import '../widgets/savings_leaderboard_panel.dart';
 
 class AchievementsPage extends StatefulWidget {
   final Stream<AppUser?>? userStream;
@@ -47,6 +48,7 @@ class _AchievementsPageState extends State<AchievementsPage> {
       ? null
       : 'No pudimos actualizar tu progreso. Los datos anteriores se conservan.';
   bool _waiting = true;
+  bool _showLeaderboard = false;
   @override
   void initState() {
     super.initState();
@@ -137,6 +139,38 @@ class _AchievementsPageState extends State<AchievementsPage> {
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          child: SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(
+                value: false,
+                label: Text('Mi progreso'),
+                icon: Icon(Icons.verified_outlined),
+              ),
+              ButtonSegment(
+                value: true,
+                label: Text('Ahorradores'),
+                icon: Icon(Icons.leaderboard_outlined),
+              ),
+            ],
+            selected: {_showLeaderboard},
+            onSelectionChanged: (value) =>
+                setState(() => _showLeaderboard = value.first),
+          ),
+        ),
+        Expanded(
+          child: _showLeaderboard && _user != null
+              ? SavingsLeaderboardPanel(userId: _user!.uid)
+              : _buildProgress(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgress(BuildContext context) {
     if (_waiting) return const Center(child: CircularProgressIndicator());
     if (_user == null) {
       return Center(

@@ -30,6 +30,9 @@ class MemoryFirestore extends FakeFirestore {
       final result = await transactionHandler(transaction);
       if (failCommit) throw StateError('commit failed');
       documents.addAll(transaction.pending);
+      for (final path in transaction.deleted) {
+        documents.remove(path);
+      }
       return result;
     } finally {
       completer.complete();
@@ -122,7 +125,14 @@ class MemoryDocument implements DocumentReference<Map<String, dynamic>> {
 class MemoryTransaction implements Transaction {
   final MemoryFirestore store;
   final pending = <String, Map<String, dynamic>>{};
+  final deleted = <String>{};
   MemoryTransaction(this.store);
+  @override
+  Transaction delete(DocumentReference reference) {
+    deleted.add(reference.path);
+    return this;
+  }
+
   @override
   Future<DocumentSnapshot<T>> get<T extends Object?>(
     DocumentReference<T> reference,

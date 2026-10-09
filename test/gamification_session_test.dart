@@ -71,6 +71,7 @@ void main() {
       points.value = 510;
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
       expect(find.text('¡Subiste al nivel 4!'), findsOneWidget);
       expect(find.text('Saldo'), findsOneWidget);
       await tester.pump(const Duration(seconds: 4));
@@ -109,7 +110,7 @@ void main() {
         ),
       );
       expect(visits, 0);
-      points.value = 140;
+      points.value = 20;
       await tester.pump();
       await tester.pump();
       expect(visits, 1);
@@ -118,14 +119,12 @@ void main() {
       await tester.pump();
       expect(visits, 1);
       reward.complete(
-        const RewardResult(
-          confirmed: true,
-          pointsAwarded: 10,
-          totalPoints: 150,
-        ),
+        const RewardResult(confirmed: true, pointsAwarded: 10, totalPoints: 30),
       );
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
       expect(find.text('Revisión diaria: +10 puntos'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
     },
   );
 }
