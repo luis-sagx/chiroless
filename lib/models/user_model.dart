@@ -4,6 +4,8 @@ class AppUser {
   final String email;
   final String level;
   final int points;
+  final int currentStreak;
+  final String? lastTxDate;
   final DateTime createdAt;
   final double openingBalanceAmount;
   final DateTime openingBalanceDate;
@@ -15,6 +17,8 @@ class AppUser {
     required this.email,
     required this.level,
     this.points = 0,
+    this.currentStreak = 0,
+    this.lastTxDate,
     required this.createdAt,
     this.openingBalanceAmount = 0,
     DateTime? openingBalanceDate,
@@ -27,6 +31,8 @@ class AppUser {
       'email': email,
       'level': level,
       'points': points,
+      'currentStreak': currentStreak,
+      'lastTxDate': lastTxDate,
       'createdAt': createdAt,
       'openingBalanceAmount': openingBalanceAmount,
       'openingBalanceDate': openingBalanceDate,

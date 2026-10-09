@@ -18,16 +18,19 @@ import '../../data/transaction_service.dart';
 import '../../data/category_service.dart';
 import '../pages/add_expense_page.dart';
 import '../pages/add_income_page.dart';
+import '../../../achievements/presentation/widgets/reward_feedback.dart';
 
 class QuickAddResult {
   final bool isExpense;
   final double amount;
   final DateTime date;
+  final RewardResult? reward;
 
   QuickAddResult({
     required this.isExpense,
     required this.amount,
     required this.date,
+    this.reward,
   });
 }
 
@@ -275,8 +278,8 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
       savedId = await _transactionService.createIncome(income);
     }
 
-    if (!mounted) return;
     if (savedId == null) {
+      if (!mounted) return;
       setState(() {
         _isSaving = false;
         _error = 'No se pudo guardar. Intenta de nuevo.';
@@ -284,22 +287,23 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
       return;
     }
 
-    if (_isExpense) {
-      unawaited(
-        _gamificationService.onTransactionRegistered(user.uid, isExpense: true),
-      );
-    } else {
-      unawaited(
-        _gamificationService.onTransactionRegistered(
-          user.uid,
-          isExpense: false,
-        ),
-      );
-    }
+    final reward = await confirmReward(
+      _gamificationService.onTransactionRegistered(
+        user.uid,
+        isExpense: _isExpense,
+      ),
+    );
+    unawaited(refreshAchievements(_gamificationService, user.uid));
+    if (!mounted) return;
 
     Navigator.pop(
       context,
-      QuickAddResult(isExpense: _isExpense, amount: amount, date: _date),
+      QuickAddResult(
+        isExpense: _isExpense,
+        amount: amount,
+        date: _date,
+        reward: reward,
+      ),
     );
   }
 

@@ -1,403 +1,325 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../../../models/achievement_model.dart';
+import '../../../models/budget_model.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../transactions/data/transaction_service.dart';
-import '../../budget/data/budget_service.dart';
+import 'gamification_rules.dart';
+
+/// An action is already saved before this result is requested. A failed reward
+/// must never ask the user to register that financial action a second time.
+class RewardResult {
+  final bool confirmed;
+  final int pointsAwarded;
+  final int totalPoints;
+  final int currentStreak;
+  final Object? error;
+  const RewardResult({
+    required this.confirmed,
+    this.pointsAwarded = 0,
+    this.totalPoints = 0,
+    this.currentStreak = 0,
+    this.error,
+  });
+}
 
 class GamificationService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final TransactionService _transactionService = TransactionService();
-  final BudgetService _budgetService = BudgetService();
+  final FirebaseFirestore _db;
+  final DateTime Function() _now;
+  GamificationService({FirebaseFirestore? firestore, DateTime Function()? now})
+    : _db = firestore ?? FirebaseFirestore.instance,
+      _now = now ?? DateTime.now;
 
-  // ========== ACHIEVEMENTS ==========
-
-  /// Verificar y desbloquear logros automáticamente
-  Future<List<Achievement>> checkAndUnlockAchievements(String userId) async {
-    try {
-      final List<Achievement> unlockedAchievements = [];
-
-      // Obtener TODOS los logros del usuario (desbloqueados y pendientes)
-      final allAchievements = await getUserAchievements(userId);
-
-      // Crear mapa: título -> logro existente
-      final Map<String, Achievement> existingAchievementsMap = {};
-      for (var achievement in allAchievements) {
-        existingAchievementsMap[achievement.title] = achievement;
-      }
-
-      // Obtener datos necesarios
-      final userSnap = await _db.collection('users').doc(userId).get();
-      final userData = userSnap.data() ?? {};
-      final currentStreak = (userData['currentStreak'] ?? 0) as int;
-      final expenses = await _transactionService.getUserExpenses(userId);
-      final incomes = await _transactionService.getUserIncomes(userId);
-
-      // Verificar cada template
-      for (var template in AchievementTemplates.templates) {
-        final title = template['title'] as String;
-        final existingAchievement = existingAchievementsMap[title];
-
-        if (existingAchievement != null &&
-            existingAchievement.unlockedAt == null &&
-            existingAchievement.id != null) {
-          await _db
-              .collection('achievements')
-              .doc(existingAchievement.id)
-              .delete();
-        }
-
-        // Si ya está desbloqueado (tiene unlockedAt), skip
-        if (existingAchievement != null &&
-            existingAchievement.unlockedAt != null) {
-          continue;
-        }
-
-        bool shouldUnlock = false;
-
-        // Lógica de desbloqueo según categoría
-        switch (template['category']) {
-          case 'milestone':
-            if (title == 'Primera transacción') {
-              shouldUnlock = expenses.isNotEmpty || incomes.isNotEmpty;
-            } else if (title == 'Control total') {
-              final totalExpenses = expenses.fold<double>(
-                0,
-                (total, expense) => total + expense.amount,
-              );
-              final impulsiveExpenses = expenses
-                  .where((e) => e.isImpulsive)
-                  .fold<double>(0, (total, expense) => total + expense.amount);
-              final impulsivePercentage = totalExpenses > 0
-                  ? (impulsiveExpenses / totalExpenses) * 100
-                  : 0;
-              shouldUnlock = expenses.length >= 10 && impulsivePercentage < 20;
-            }
-            break;
-
-          case 'streak':
-            if (title == 'Racha de 7 días') {
-              shouldUnlock = currentStreak >= 7;
-            }
-            break;
-
-          case 'budget':
-            if (title == 'Presupuesto cumplido') {
-              final now = DateTime.now();
-              final prev = DateTime(now.year, now.month - 1, 1);
-              final prevMonth =
-                  '${prev.year}-${prev.month.toString().padLeft(2, '0')}';
-              final prevBudget = await _budgetService.getBudgetByMonth(
-                userId,
-                prevMonth,
-              );
-              if (prevBudget != null) {
-                final prevExpenses = await _transactionService.getUserExpenses(
-                  userId,
-                  month: prevMonth,
-                );
-                final spent = prevExpenses.fold<double>(
-                  0,
-                  (total, expense) => total + expense.amount,
-                );
-                shouldUnlock = spent <= prevBudget.monthlyLimit;
-              }
-            }
-            break;
-
-          case 'savings':
-            if (title == 'Ahorrador novato') {
-              final totalIncome = incomes.fold<double>(
-                0,
-                (total, income) => total + income.amount,
-              );
-              final totalExpense = expenses.fold<double>(
-                0,
-                (total, expense) => total + expense.amount,
-              );
-              final savings = totalIncome - totalExpense;
-              final savingsPercentage = totalIncome > 0
-                  ? (savings / totalIncome) * 100
-                  : 0;
-              shouldUnlock =
-                  incomes.isNotEmpty &&
-                  expenses.length >= 5 &&
-                  savingsPercentage >= 10;
-            }
-            break;
-        }
-
-        // Si debe desbloquearse
-        if (shouldUnlock) {
-          final key = template['key'] as String;
-          final docId = '${userId}_$key';
-          final achievement = Achievement(
-            id: docId,
-            userId: userId,
-            title: title,
-            description: template['description'] as String,
-            icon: template['icon'] as String,
-            points: template['points'] as int,
-            category: template['category'] as String,
-            unlockedAt: DateTime.now(),
-          );
-          await _db
-              .collection('achievements')
-              .doc(docId)
-              .set(achievement.toMap(), SetOptions(merge: true));
-          unlockedAchievements.add(achievement);
-          await _addPoints(userId, template['points'] as int);
-        }
-      }
-
-      return unlockedAchievements;
-    } catch (e) {
-      print('Error verificando logros: $e');
-      return [];
-    }
-  }
-
-  /// Mantiene la racha diaria de transacciones en el documento del usuario.
-  Future<void> _updateStreak(String userId) async {
-    try {
-      final userRef = _db.collection('users').doc(userId);
-      await _db.runTransaction((tx) async {
-        final snap = await tx.get(userRef);
-        if (!snap.exists) return;
-        final data = snap.data()!;
-        final now = DateTime.now();
-        final today =
-            '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-        final yesterdayDate = now.subtract(const Duration(days: 1));
-        final yesterday =
-            '${yesterdayDate.year}-${yesterdayDate.month.toString().padLeft(2, '0')}-${yesterdayDate.day.toString().padLeft(2, '0')}';
-
-        final lastTxDate = data['lastTxDate'] as String?;
-        final currentStreak = (data['currentStreak'] ?? 0) as int;
-
-        if (lastTxDate == today) return;
-        final newStreak = lastTxDate == yesterday ? currentStreak + 1 : 1;
-        tx.update(userRef, {'currentStreak': newStreak, 'lastTxDate': today});
-      });
-    } catch (e) {
-      print('Error actualizando racha: $e');
-    }
-  }
-
-  /// Obtener logros del usuario
-  Future<List<Achievement>> getUserAchievements(String userId) async {
-    try {
-      final snapshot = await _db
-          .collection('achievements')
-          .where('userId', isEqualTo: userId)
-          .orderBy('unlockedAt', descending: true)
-          .get();
-
-      return snapshot.docs
-          .map((doc) => Achievement.fromMap(doc.data(), doc.id))
-          .toList();
-    } catch (e) {
-      print('Error obteniendo logros: $e');
-      return [];
-    }
-  }
-
-  // ========== POINTS & LEVELS ==========
-
-  /// Agregar puntos al usuario y actualizar nivel
-  Future<void> _addPoints(String userId, int points) async {
-    try {
-      final userRef = _db.collection('users').doc(userId);
-      await _db.runTransaction((tx) async {
-        final snap = await tx.get(userRef);
-        if (!snap.exists) return;
-        final current = (snap.data()!['points'] ?? 0) as int;
-        final newPoints = current + points;
-        tx.update(userRef, {
-          'points': newPoints,
-          'level': _calculateLevel(newPoints),
-        });
-      });
-    } catch (e) {
-      print('Error agregando puntos: $e');
-    }
-  }
-
-  /// Calcular nivel basado en puntos
-  String _calculateLevel(int points) {
-    if (points >= 1000) return 'Maestro Financiero';
-    if (points >= 750) return 'Estratégico';
-    if (points >= 500) return 'Responsable';
-    if (points >= 300) return 'Organizado';
-    if (points >= 150) return 'Novato';
-    return 'Principiante';
-  }
-
-  /// Punto de entrada único post-transacción. Se llama SIN await desde la UI.
-  /// Nunca lanza excepciones.
-  Future<void> onTransactionRegistered(
+  /// Confirms only the action reward. Achievement scans are a separate step,
+  /// allowing the UI to show these points without waiting for monthly queries.
+  Future<RewardResult> onTransactionRegistered(
     String userId, {
     required bool isExpense,
+  }) => _reward(
+    userId,
+    isExpense
+        ? AppConstants.pointsPerExpenseRegistered
+        : AppConstants.pointsPerIncomeRegistered,
+    updateStreak: true,
+  );
+
+  Future<RewardResult> rewardAction(
+    String userId,
+    String action, {
+    String? month,
+  }) {
+    if (action == 'budget_set') {
+      if (month == null ||
+          !RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(month)) {
+        return Future.value(
+          RewardResult(
+            confirmed: false,
+            error: ArgumentError('A budget reward requires its YYYY-MM month'),
+          ),
+        );
+      }
+      return _reward(userId, 25, budgetMonth: month);
+    }
+    final points = switch (action) {
+      'expense_registered' => AppConstants.pointsPerExpenseRegistered,
+      'income_registered' => AppConstants.pointsPerIncomeRegistered,
+      'budget_complied' => AppConstants.pointsPerBudgetCompliance,
+      _ => 0,
+    };
+    return _reward(userId, points);
+  }
+
+  /// One bonus for the first visit on a local calendar date. Visiting does not
+  /// extend the streak that requires a registered financial transaction.
+  Future<RewardResult> rewardDailyVisit(String userId) =>
+      _reward(userId, 10, dailyVisit: true);
+
+  Future<RewardResult> _reward(
+    String userId,
+    int points, {
+    bool updateStreak = false,
+    String? budgetMonth,
+    bool dailyVisit = false,
   }) async {
-    await rewardAction(
-      userId,
-      isExpense ? 'expense_registered' : 'income_registered',
+    final now = _now();
+    try {
+      return await _db.runTransaction((tx) async {
+        final reference = _db.collection('users').doc(userId);
+        final snapshot = await tx.get(reference);
+        if (!snapshot.exists) throw StateError('User does not exist');
+        final data = snapshot.data()!;
+        final months = List<String>.from(
+          data['rewardedBudgetMonths'] ?? const [],
+        );
+        final today = GamificationRules.dayKey(now);
+        final dailyDate = data['lastDailyRewardDate'] as String?;
+        // Dates sort chronologically. An older device clock cannot move this
+        // marker backwards and earn another bonus for a previously visited day.
+        final dailyAlreadyAwarded =
+            dailyVisit && dailyDate != null && dailyDate.compareTo(today) >= 0;
+        final awarded =
+            dailyAlreadyAwarded ||
+                (budgetMonth != null && months.contains(budgetMonth))
+            ? 0
+            : points;
+        final total = ((data['points'] ?? 0) as num).toInt() + awarded;
+        var streak = ((data['currentStreak'] ?? 0) as num).toInt();
+        final updates = <String, dynamic>{
+          'points': total,
+          'level': GamificationRules.levelName(total),
+        };
+        if (updateStreak) {
+          final lastDate = data['lastTxDate'] as String?;
+          if (lastDate != today) {
+            streak = GamificationRules.activeStreak(streak, lastDate, now) + 1;
+          }
+          updates.addAll({'currentStreak': streak, 'lastTxDate': today});
+        }
+        if (budgetMonth != null && awarded > 0) {
+          updates['rewardedBudgetMonths'] = [...months, budgetMonth];
+        }
+        if (dailyVisit && awarded > 0) {
+          updates['lastDailyRewardDate'] = today;
+        }
+        tx.update(reference, updates);
+        return RewardResult(
+          confirmed: true,
+          pointsAwarded: awarded,
+          totalPoints: total,
+          currentStreak: streak,
+        );
+      });
+    } catch (error) {
+      return RewardResult(confirmed: false, error: error);
+    }
+  }
+
+  /// Errors propagate: unavailable data cannot safely be treated as zero spent.
+  Future<List<Achievement>> checkAndUnlockAchievements(String userId) async {
+    final now = _now();
+    final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final previous = DateTime(now.year, now.month - 1);
+    final previousMonth =
+        '${previous.year}-${previous.month.toString().padLeft(2, '0')}';
+    final existing = await getUserAchievements(userId);
+    final user = (await _db.collection('users').doc(userId).get()).data();
+    if (user == null) throw StateError('User does not exist');
+    final expenses = await _records('expenses', userId, month: month);
+    final incomes = await _records('incomes', userId, month: month);
+    final budgets = await _db
+        .collection('budgets')
+        .where('userId', isEqualTo: userId)
+        .get();
+    final previousBudget = Budget.latestForMonth(
+      budgets.docs.map((doc) => Budget.fromMap(doc.data(), doc.id)),
+      previousMonth,
     );
-    await _updateStreak(userId);
-    await checkAndUnlockAchievements(userId);
-  }
-
-  /// Calcular nivel numérico basado en puntos (público)
-  int calculateLevel(int points) {
-    if (points >= 1000) return 6;
-    if (points >= 750) return 5;
-    if (points >= 500) return 4;
-    if (points >= 300) return 3;
-    if (points >= 150) return 2;
-    return 1;
-  }
-
-  /// Obtener puntos necesarios para el siguiente nivel
-  int pointsForNextLevel(int currentLevel) {
-    switch (currentLevel) {
-      case 1:
-        return 150;
-      case 2:
-        return 300;
-      case 3:
-        return 500;
-      case 4:
-        return 750;
-      case 5:
-        return 1000;
-      default:
-        return 1000; // Nivel máximo
-    }
-  }
-
-  /// Puntos mínimos del nivel actual.
-  int pointsForCurrentLevel(int level) {
-    switch (level) {
-      case 1:
-        return 0;
-      case 2:
-        return 150;
-      case 3:
-        return 300;
-      case 4:
-        return 500;
-      case 5:
-        return 750;
-      default:
-        return 1000;
-    }
-  }
-
-  /// Obtener puntos y nivel actual del usuario
-  Future<Map<String, dynamic>> getUserProgress(String userId) async {
-    try {
-      final userDoc = await _db.collection('users').doc(userId).get();
-      if (!userDoc.exists) {
-        return {
-          'points': 0,
-          'level': 'Principiante',
-          'nextLevel': 'Novato',
-          'pointsToNextLevel': 150,
-        };
-      }
-
-      final userData = userDoc.data()!;
-      final points = userData['points'] ?? 0;
-      final level = userData['level'] ?? 'Principiante';
-
-      // Calcular próximo nivel
-      final levelInfo = _getNextLevelInfo(points, level);
-
-      return {
-        'points': points,
-        'level': level,
-        'nextLevel': levelInfo['nextLevel'],
-        'pointsToNextLevel': levelInfo['pointsNeeded'],
-      };
-    } catch (e) {
-      print('Error obteniendo progreso: $e');
-      return {
-        'points': 0,
-        'level': 'Principiante',
-        'nextLevel': 'Novato',
-        'pointsToNextLevel': 150,
-      };
-    }
-  }
-
-  /// Obtener información del próximo nivel
-  Map<String, dynamic> _getNextLevelInfo(
-    int currentPoints,
-    String currentLevel,
-  ) {
-    final levels = [
-      {'name': 'Principiante', 'minPoints': 0},
-      {'name': 'Novato', 'minPoints': 150},
-      {'name': 'Organizado', 'minPoints': 300},
-      {'name': 'Responsable', 'minPoints': 500},
-      {'name': 'Estratégico', 'minPoints': 750},
-      {'name': 'Maestro Financiero', 'minPoints': 1000},
-    ];
-
-    for (int i = 0; i < levels.length - 1; i++) {
-      if (levels[i]['name'] == currentLevel) {
-        final nextLevel = levels[i + 1];
-        return {
-          'nextLevel': nextLevel['name'],
-          'pointsNeeded': (nextLevel['minPoints'] as int) - currentPoints,
-        };
+    final previousExpenses = previousBudget == null
+        ? <Map<String, dynamic>>[]
+        : await _records('expenses', userId, month: previousMonth);
+    // Historical existence is bounded to one record per collection. It repairs
+    // first-transaction eligibility even if the current month has no activity.
+    final needsFirst = !existing.any(
+      (a) => a.title == 'Primera transacción' && a.isUnlocked,
+    );
+    var anyTransaction = expenses.isNotEmpty || incomes.isNotEmpty;
+    if (needsFirst && !anyTransaction) {
+      anyTransaction =
+          (await _db
+                  .collection('expenses')
+                  .where('userId', isEqualTo: userId)
+                  .limit(1)
+                  .get())
+              .docs
+              .isNotEmpty;
+      if (!anyTransaction) {
+        anyTransaction =
+            (await _db
+                    .collection('incomes')
+                    .where('userId', isEqualTo: userId)
+                    .limit(1)
+                    .get())
+                .docs
+                .isNotEmpty;
       }
     }
-
-    return {'nextLevel': 'Máximo alcanzado', 'pointsNeeded': 0};
-  }
-
-  // ========== REWARDS ==========
-
-  /// Dar puntos por acciones del usuario
-  Future<void> rewardAction(String userId, String action) async {
-    try {
-      int points = 0;
-
-      switch (action) {
-        case 'expense_registered':
-          points = AppConstants.pointsPerExpenseRegistered;
-          break;
-        case 'income_registered':
-          points = AppConstants.pointsPerIncomeRegistered;
-          break;
-        case 'budget_set':
-          points = 25;
-          break;
-        case 'budget_complied':
-          points = AppConstants.pointsPerBudgetCompliance;
-          break;
-      }
-
-      if (points > 0) {
-        await _addPoints(userId, points);
-      }
-    } catch (e) {
-      print('Error recompensando acción: $e');
+    double sum(List<Map<String, dynamic>> records) => records.fold(
+      0.0,
+      (total, record) => total + ((record['amount'] ?? 0) as num).toDouble(),
+    );
+    final unlocked = <Achievement>[];
+    for (final template in AchievementTemplates.templates) {
+      final key = template['key'] as String;
+      final title = template['title'] as String;
+      if (existing.any((a) => a.title == title && a.isUnlocked)) continue;
+      final progress = GamificationRules.achievementProgress(
+        key,
+        currentStreak: GamificationRules.activeStreak(
+          ((user['currentStreak'] ?? 0) as num).toInt(),
+          user['lastTxDate'] as String?,
+          now,
+        ),
+        expenseCount: expenses.length,
+        incomeCount: incomes.length,
+        totalExpenses: sum(expenses),
+        totalIncomes: sum(incomes),
+        impulsiveExpenses: sum(
+          expenses.where((e) => e['isImpulsive'] == true).toList(),
+        ),
+        hasPreviousBudget: previousBudget != null,
+        previousExpenses: sum(previousExpenses),
+        previousBudgetLimit: previousBudget?.monthlyLimit ?? 0,
+        hasAnyTransaction: anyTransaction,
+      );
+      if (progress < 1) continue;
+      final awarded = await _unlock(
+        userId,
+        template,
+        existing.where((a) => a.title == title).toList(),
+        now,
+      );
+      if (awarded != null) unlocked.add(awarded);
     }
+    return unlocked;
   }
 
-  /// Stream de logros en tiempo real
-  Stream<List<Achievement>> watchUserAchievements(String userId) {
-    return _db
+  Future<Achievement?> _unlock(
+    String userId,
+    Map<String, dynamic> template,
+    List<Achievement> legacy,
+    DateTime now,
+  ) async {
+    return _db.runTransaction((tx) async {
+      final userRef = _db.collection('users').doc(userId);
+      final userSnap = await tx.get(userRef);
+      if (!userSnap.exists) throw StateError('User does not exist');
+      final data = userSnap.data()!;
+      final key = template['key'] as String;
+      final rewarded = Map<String, dynamic>.from(
+        data['rewardedAchievements'] ?? const {},
+      );
+      if (rewarded[key] == true) return null;
+      // Only read existing documents returned by the owner query. Existing
+      // rules deny reads of missing achievements; the user marker guards races.
+      for (final achievement in legacy) {
+        if (achievement.id == null) continue;
+        final snapshot = await tx.get(
+          _db.collection('achievements').doc(achievement.id),
+        );
+        if (snapshot.data()?['unlockedAt'] != null) return null;
+      }
+      final id = legacy.firstOrNull?.id ?? '${userId}_$key';
+      final achievement = Achievement(
+        id: id,
+        userId: userId,
+        title: template['title'] as String,
+        description: template['description'] as String,
+        icon: template['icon'] as String,
+        points: template['points'] as int,
+        category: template['category'] as String,
+        type: key,
+        unlockedAt: now,
+      );
+      final total = ((data['points'] ?? 0) as num).toInt() + achievement.points;
+      tx.set(
+        _db.collection('achievements').doc(id),
+        achievement.toMap(),
+        SetOptions(merge: true),
+      );
+      tx.update(userRef, {
+        'points': total,
+        'level': GamificationRules.levelName(total),
+        'rewardedAchievements': {...rewarded, key: true},
+      });
+      return achievement;
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> _records(
+    String collection,
+    String userId, {
+    required String month,
+  }) async {
+    final snapshot = await _db
+        .collection(collection)
+        .where('userId', isEqualTo: userId)
+        .where('month', isEqualTo: month)
+        .get();
+    return snapshot.docs.map((doc) => doc.data()).toList();
+  }
+
+  Future<List<Achievement>> getUserAchievements(String userId) async {
+    final snapshot = await _db
         .collection('achievements')
         .where('userId', isEqualTo: userId)
-        .orderBy('unlockedAt', descending: true)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => Achievement.fromMap(doc.data(), doc.id))
-              .toList(),
-        );
+        .get();
+    return snapshot.docs
+        .map((doc) => Achievement.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  Stream<List<Achievement>> watchUserAchievements(String userId) => _db
+      .collection('achievements')
+      .where('userId', isEqualTo: userId)
+      .snapshots()
+      .map(
+        (snapshot) => snapshot.docs
+            .map((doc) => Achievement.fromMap(doc.data(), doc.id))
+            .toList(),
+      );
+
+  int calculateLevel(int points) => GamificationRules.levelForPoints(points);
+  int pointsForNextLevel(int currentLevel) =>
+      GamificationRules.nextLevelThreshold(currentLevel);
+  int pointsForCurrentLevel(int level) => GamificationRules.levelFloor(level);
+  Future<Map<String, dynamic>> getUserProgress(String userId) async {
+    final data = (await _db.collection('users').doc(userId).get()).data() ?? {};
+    final points = ((data['points'] ?? 0) as num).toInt();
+    final level = calculateLevel(points);
+    return {
+      'points': points,
+      'level': GamificationRules.levelName(points),
+      'numericLevel': level,
+      'nextLevel': GamificationRules.levelName(pointsForNextLevel(level)),
+      'pointsToNextLevel': pointsForNextLevel(level) - points,
+    };
   }
 }

@@ -23,6 +23,8 @@ class UserService {
           email: data['email'] ?? '',
           level: data['level'] ?? 'Principiante',
           points: data['points'] ?? 0,
+          currentStreak: (data['currentStreak'] as num?)?.toInt() ?? 0,
+          lastTxDate: data['lastTxDate'] as String?,
           createdAt: (data['createdAt'] as Timestamp).toDate(),
           openingBalanceAmount:
               (data['openingBalanceAmount'] as num?)?.toDouble() ?? 0,
@@ -47,6 +49,8 @@ class UserService {
           email: data['email'] ?? '',
           level: data['level'] ?? 'Principiante',
           points: data['points'] ?? 0,
+          currentStreak: (data['currentStreak'] as num?)?.toInt() ?? 0,
+          lastTxDate: data['lastTxDate'] as String?,
           createdAt: (data['createdAt'] as Timestamp).toDate(),
           openingBalanceAmount:
               (data['openingBalanceAmount'] as num?)?.toDouble() ?? 0,

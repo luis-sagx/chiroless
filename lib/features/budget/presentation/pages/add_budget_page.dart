@@ -1,3 +1,6 @@
+import 'dart:async';
+import '../../../achievements/data/gamification_service.dart';
+import '../../../achievements/presentation/widgets/reward_feedback.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/services/firebase_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -79,14 +82,22 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
 
       final savedId = await _budgetService.setBudget(budget);
       if (savedId == null) throw Exception('No se pudo guardar el presupuesto');
+      final gamification = GamificationService();
+      final reward = await confirmReward(
+        gamification.rewardAction(user.uid, 'budget_set', month: budget.month),
+      );
+      unawaited(refreshAchievements(gamification, user.uid));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              widget.existingBudget != null
-                  ? 'Presupuesto actualizado exitosamente'
-                  : 'Presupuesto creado exitosamente',
+              savedActionFeedback(
+                widget.existingBudget != null
+                    ? 'Presupuesto actualizado exitosamente'
+                    : 'Presupuesto creado exitosamente',
+                reward,
+              ),
             ),
             backgroundColor: Colors.green,
           ),

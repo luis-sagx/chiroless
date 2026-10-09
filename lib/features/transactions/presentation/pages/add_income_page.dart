@@ -10,6 +10,7 @@ import '../../data/transaction_service.dart';
 import '../../data/category_service.dart';
 import '../../data/recurring_transaction_service.dart';
 import '../../../achievements/data/gamification_service.dart';
+import '../../../achievements/presentation/widgets/reward_feedback.dart';
 import '../widgets/recurrence_form_fields.dart';
 
 class AddIncomePage extends StatefulWidget {
@@ -129,13 +130,15 @@ class _AddIncomePageState extends State<AddIncomePage> {
           ? await _saveNewIncome(user.uid, income)
           : await _transactionService.updateIncome(income);
       if (!saved) throw Exception('No se pudo guardar el ingreso');
+      RewardResult? reward;
       if (widget.income == null) {
-        unawaited(
+        reward = await confirmReward(
           _gamificationService.onTransactionRegistered(
             user.uid,
             isExpense: false,
           ),
         );
+        unawaited(refreshAchievements(_gamificationService, user.uid));
       }
 
       if (mounted) {
@@ -143,7 +146,7 @@ class _AddIncomePageState extends State<AddIncomePage> {
           SnackBar(
             content: Text(
               widget.income == null
-                  ? 'Ingreso registrado'
+                  ? savedActionFeedback('Ingreso registrado', reward)
                   : 'Ingreso actualizado',
             ),
             backgroundColor: Colors.green,
