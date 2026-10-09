@@ -25,6 +25,7 @@ import '../../../achievements/data/gamification_service.dart';
 import '../../../achievements/presentation/widgets/reward_feedback.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../profile/presentation/pages/edit_profile_page.dart';
+import '../../../profile/presentation/pages/opening_balance_page.dart';
 import '../../../profile/presentation/pages/help_page.dart';
 import '../../../profile/presentation/pages/terms_conditions_page.dart';
 import '../../../ai_assistant/presentation/pages/ai_assistant_page.dart';
@@ -300,6 +301,16 @@ class _HomePageState extends State<HomePage> {
     );
     if (result == true) {
       _loadUser(); // Reload to update user data
+    }
+  }
+
+  Future<void> _navigateToOpeningBalance() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const OpeningBalancePage()),
+    );
+    if (result == true) {
+      _loadUser(); // Reload to update the balance
     }
   }
 
@@ -867,6 +878,11 @@ class _HomePageState extends State<HomePage> {
                 Icons.person_outline,
                 'Editar perfil',
                 _navigateToEditProfile,
+              ),
+              _buildMenuItem(
+                Icons.account_balance_wallet_outlined,
+                'Saldo inicial',
+                _navigateToOpeningBalance,
               ),
               _buildMenuItem(
                 Icons.category_outlined,
