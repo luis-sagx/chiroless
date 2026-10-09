@@ -1,500 +1,347 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/services/firebase_service.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../data/gamification_service.dart';
 import '../../../../models/achievement_model.dart';
+import '../../../../models/user_model.dart';
+import '../../../../models/expense_model.dart';
+import '../../../../models/income_model.dart';
+import '../../../../models/budget_model.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../auth/data/user_service.dart';
+import '../../../transactions/data/transaction_service.dart';
+import '../../data/gamification_service.dart';
+import '../../data/gamification_rules.dart';
+import '../widgets/personal_progress_card.dart';
 
 class AchievementsPage extends StatefulWidget {
-  const AchievementsPage({Key? key}) : super(key: key);
-
+  final Stream<AppUser?>? userStream;
+  final Stream<List<Achievement>>? achievementsStream;
+  final Stream<List<Expense>>? expensesStream;
+  final Stream<List<Income>>? incomesStream;
+  final Stream<List<Budget>>? budgetsStream;
+  final Stream<List<Expense>>? previousExpensesStream;
+  const AchievementsPage({
+    super.key,
+    this.userStream,
+    this.achievementsStream,
+    this.expensesStream,
+    this.incomesStream,
+    this.budgetsStream,
+    this.previousExpensesStream,
+  });
   @override
   State<AchievementsPage> createState() => _AchievementsPageState();
 }
 
 class _AchievementsPageState extends State<AchievementsPage> {
-  final _firebaseService = FirebaseService();
-  final _gamificationService = GamificationService();
-  final _userService = UserService();
-
-  bool _isLoading = true;
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
+  AppUser? _user;
   List<Achievement> _achievements = [];
-  int _userPoints = 0;
-  int _userLevel = 1;
-  int _currentLevelPoints = 0;
-  int _nextLevelPoints = 100;
-
+  List<Expense>? _expenses;
+  List<Income>? _incomes;
+  List<Budget>? _budgets;
+  List<Expense>? _previousExpenses;
+  final Set<Object> _failedStreams = {};
+  String? get _error => _failedStreams.isEmpty
+      ? null
+      : 'No pudimos actualizar tu progreso. Los datos anteriores se conservan.';
+  bool _waiting = true;
   @override
   void initState() {
     super.initState();
-    _loadData();
+    final uid = widget.userStream == null
+        ? FirebaseService().currentUser?.uid
+        : null;
+    if (uid == null && widget.userStream == null) {
+      _waiting = false;
+      return;
+    }
+    void listen<T>(Stream<T> stream, void Function(T) update) {
+      _subscriptions.add(
+        stream.listen(
+          (value) {
+            if (mounted) {
+              setState(() {
+                _failedStreams.remove(stream);
+                update(value);
+              });
+            }
+          },
+          onError: (Object error) {
+            if (mounted) {
+              setState(() {
+                _waiting = false;
+                _failedStreams.add(stream);
+              });
+            }
+          },
+        ),
+      );
+    }
+
+    listen<AppUser?>(widget.userStream ?? UserService().getUserStream(uid!), (
+      value,
+    ) {
+      _user = value;
+      _waiting = false;
+    });
+    listen<List<Achievement>>(
+      widget.achievementsStream ??
+          GamificationService().watchUserAchievements(uid!),
+      (value) => _achievements = value,
+    );
+    listen<List<Expense>>(
+      widget.expensesStream ?? TransactionService().watchUserExpenses(uid!),
+      (value) => _expenses = value,
+    );
+    listen<List<Income>>(
+      widget.incomesStream ?? TransactionService().watchUserIncomes(uid!),
+      (value) => _incomes = value,
+    );
+    final now = DateTime.now();
+    final previous = DateTime(now.year, now.month - 1);
+    final month =
+        '${previous.year}-${previous.month.toString().padLeft(2, '0')}';
+    listen<List<Budget>>(
+      widget.budgetsStream ??
+          (uid == null
+              ? Stream.value(<Budget>[])
+              : FirebaseFirestore.instance
+                    .collection('budgets')
+                    .where('userId', isEqualTo: uid)
+                    .snapshots()
+                    .map(
+                      (snapshot) => snapshot.docs
+                          .map((doc) => Budget.fromMap(doc.data(), doc.id))
+                          .toList(),
+                    )),
+      (value) => _budgets = value,
+    );
+    listen<List<Expense>>(
+      widget.previousExpensesStream ??
+          (uid == null
+              ? Stream.value(<Expense>[])
+              : TransactionService().watchUserExpenses(uid, month: month)),
+      (value) => _previousExpenses = value,
+    );
   }
 
-  Future<void> _loadData() async {
-    if (mounted) {
-      setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
     }
-
-    try {
-      final user = _firebaseService.currentUser;
-      if (user == null) return;
-
-      // Get user data
-      final userData = await _userService.getUser(user.uid);
-      final points = userData?.points ?? 0;
-      final level = _gamificationService.calculateLevel(points);
-      final currentLevelPoints = _gamificationService.pointsForCurrentLevel(
-        level,
-      );
-      final nextLevel = _gamificationService.pointsForNextLevel(level);
-
-      // Get all achievements
-      final achievements = await _gamificationService.getUserAchievements(
-        user.uid,
-      );
-
-      if (mounted) {
-        setState(() {
-          _userPoints = points;
-          _userLevel = level;
-          _currentLevelPoints = currentLevelPoints;
-          _nextLevelPoints = nextLevel;
-          _achievements = achievements;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+    if (_waiting) return const Center(child: CircularProgressIndicator());
+    if (_user == null) {
+      return Center(
+        child: Text(_error ?? 'Inicia sesión para ver tu progreso.'),
+      );
     }
-
-    final unlockedAchievements = _achievements
+    final unlocked = _achievements
         .where((a) => a.isUnlocked)
+        .map((a) => a.title)
+        .toSet();
+    final pending = AchievementTemplates.templates
+        .where((t) => !unlocked.contains(t['title']))
         .toList();
-    final unlockedTitles = unlockedAchievements.map((a) => a.title).toSet();
-    final lockedAchievements = AchievementTemplates.templates
-        .where((template) => !unlockedTitles.contains(template['title']))
-        .map(
-          (template) => Achievement(
-            userId: '',
-            title: template['title'] as String,
-            description: template['description'] as String,
-            icon: template['icon'] as String,
-            points: template['points'] as int,
-            category: template['category'] as String,
+    final streak = GamificationRules.activeStreak(
+      _user!.currentStreak,
+      _user!.lastTxDate,
+      DateTime.now(),
+    );
+    final expenses = _expenses ?? <Expense>[];
+    final incomes = _incomes ?? <Income>[];
+    final totalExpenses = expenses.fold<double>(
+      0,
+      (total, e) => total + e.amount,
+    );
+    final totalIncomes = incomes.fold<double>(
+      0,
+      (total, i) => total + i.amount,
+    );
+    final impulsive = expenses
+        .where((e) => e.isImpulsive)
+        .fold<double>(0, (total, e) => total + e.amount);
+    final previous = DateTime(DateTime.now().year, DateTime.now().month - 1);
+    final previousMonth =
+        '${previous.year}-${previous.month.toString().padLeft(2, '0')}';
+    final budget = Budget.latestForMonth(_budgets ?? [], previousMonth);
+    double progress(String key) => GamificationRules.achievementProgress(
+      key,
+      currentStreak: streak,
+      expenseCount: expenses.length,
+      incomeCount: incomes.length,
+      totalExpenses: totalExpenses,
+      totalIncomes: totalIncomes,
+      impulsiveExpenses: impulsive,
+      hasAnyTransaction: expenses.isNotEmpty || incomes.isNotEmpty,
+      hasPreviousBudget: budget != null,
+      previousExpenses: (_previousExpenses ?? []).fold<double>(
+        0,
+        (total, e) => total + e.amount,
+      ),
+      previousBudgetLimit: budget?.monthlyLimit ?? 0,
+    );
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Logros y Progreso',
+            style: Theme.of(context).textTheme.headlineLarge,
           ),
-        )
-        .toList();
-
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Text(
-              'Logros y Progreso',
-              style: Theme.of(context).textTheme.headlineLarge,
+          const SizedBox(height: 20),
+          PersonalProgressCard(user: _user!),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Colors.orange),
+              ),
             ),
-            const SizedBox(height: 24),
-
-            // Level Card
+          const SizedBox(height: 20),
+          if (pending.isNotEmpty)
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
+                color: AppTheme.primaryColor.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Tu Nivel',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Text(
-                                  'Nivel $_userLevel',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Flexible(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.2,
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.star,
-                                          color: Colors.amber,
-                                          size: 14,
-                                        ),
-                                        const SizedBox(width: 3),
-                                        Flexible(
-                                          child: Text(
-                                            '$_userPoints pts',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.emoji_events,
-                          color: Colors.amber,
-                          size: 32,
-                        ),
-                      ),
-                    ],
+                  const Text(
+                    'Tu próxima acción',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
-                  const SizedBox(height: 24),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Progreso al Nivel ${_userLevel + 1}',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          ),
-                          Text(
-                            '$_userPoints / $_nextLevelPoints',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value:
-                              ((_userPoints - _currentLevelPoints) /
-                                      (_nextLevelPoints - _currentLevelPoints))
-                                  .clamp(0.0, 1.0),
-                          minHeight: 12,
-                          backgroundColor: Colors.white.withValues(alpha: 0.2),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Colors.amber,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Unlocked Achievements
-            if (unlockedAchievements.isNotEmpty) ...[
-              Row(
-                children: [
+                  const SizedBox(height: 8),
                   Text(
-                    'Desbloqueados',
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    '${pending.first['title']} · +${pending.first['points']} puntos',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.secondaryColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${unlockedAchievements.length}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ...unlockedAchievements.map(
-                (achievement) => _buildAchievementCard(achievement, true),
-              ),
-              const SizedBox(height: 24),
-            ],
-
-            // Locked Achievements
-            if (lockedAchievements.isNotEmpty) ...[
-              Row(
-                children: [
                   Text(
-                    'Por Desbloquear',
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    !unlocked.contains('Primera transacción')
+                        ? 'Registra tu primer ingreso o gasto real.'
+                        : !unlocked.contains('Racha de 7 días')
+                        ? 'Registra los movimientos reales del día. Racha: $streak de 7 días.'
+                        : !unlocked.contains('Presupuesto cumplido')
+                        ? 'Configura un presupuesto y mantén tus gastos dentro del límite mensual.'
+                        : !unlocked.contains('Ahorrador novato')
+                        ? 'Revisa tu ahorro del mes: al menos 10% de ingresos y ${expenses.length.clamp(0, 5)} de 5 gastos reales registrados.'
+                        : 'Revisa tus compras impulsivas: ${expenses.length.clamp(0, 10)} de 10 gastos reales registrados; objetivo menor al 20% del importe.',
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${lockedAchievements.length}',
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ...lockedAchievements.map(
-                (achievement) => _buildAchievementCard(achievement, false),
-              ),
-            ],
-
-            // Empty State
-            if (unlockedAchievements.isEmpty && lockedAchievements.isEmpty) ...[
-              const SizedBox(height: 60),
-              Center(
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.emoji_events_outlined,
-                      size: 80,
-                      color: Colors.grey.shade300,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Sin logros aún',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Comienza a usar la app para desbloquear logros',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAchievementCard(Achievement achievement, bool isUnlocked) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isUnlocked ? Colors.white : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(16),
-        border: isUnlocked
-            ? Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.3))
-            : null,
-        boxShadow: isUnlocked
-            ? [
-                BoxShadow(
-                  color: AppTheme.secondaryColor.withValues(alpha: 0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ]
-            : null,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isUnlocked
-                  ? AppTheme.secondaryColor.withValues(alpha: 0.1)
-                  : Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              _getAchievementIcon(achievement.type),
-              color: isUnlocked
-                  ? AppTheme.secondaryColor
-                  : Colors.grey.shade600,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  achievement.title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: isUnlocked ? Colors.black : Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  achievement.description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isUnlocked
-                        ? Colors.grey.shade600
-                        : Colors.grey.shade500,
-                  ),
-                ),
-                if (isUnlocked && achievement.unlockedAt != null) ...[
                   const SizedBox(height: 4),
-                  Text(
-                    'Desbloqueado: ${_formatDate(achievement.unlockedAt!)}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppTheme.secondaryColor,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  const Text(
+                    'Registra tus finanzas para conocer tus hábitos.',
+                    style: TextStyle(fontSize: 12),
                   ),
                 ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isUnlocked
-                      ? AppTheme.secondaryColor
-                      : Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.star, color: Colors.white, size: 12),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${achievement.points}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
               ),
-            ],
+            ),
+          const SizedBox(height: 24),
+          Text(
+            '${unlocked.length} de ${AchievementTemplates.templates.length} logros completados',
+            style: Theme.of(context).textTheme.titleMedium,
           ),
+          const SizedBox(height: 12),
+          for (final template in AchievementTemplates.templates)
+            _achievement(
+              template,
+              unlocked.contains(template['title']),
+              progress(template['key'] as String),
+            ),
         ],
       ),
     );
   }
 
-  IconData _getAchievementIcon(String type) {
-    switch (type) {
-      case 'first_expense':
-        return Icons.shopping_cart;
-      case 'first_income':
-        return Icons.account_balance_wallet;
-      case 'streak_7':
-      case 'streak_30':
-        return Icons.local_fire_department;
-      case 'budget_set':
-        return Icons.savings;
-      case 'expense_50':
-      case 'expense_100':
-        return Icons.receipt_long;
-      case 'savings_goal':
-        return Icons.star;
-      default:
-        return Icons.emoji_events;
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
+  Widget _achievement(
+    Map<String, dynamic> template,
+    bool unlocked,
+    double progress,
+  ) {
+    final key = template['key'] as String;
+    final observable = key == 'budget_month'
+        ? _budgets != null && _previousExpenses != null
+        : _expenses != null && _incomes != null;
+    const icons = {
+      'star': Icons.star,
+      'local_fire_department': Icons.local_fire_department,
+      'check_circle': Icons.check_circle,
+      'savings': Icons.savings,
+      'psychology': Icons.psychology,
+    };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: unlocked ? AppTheme.secondaryColor : Colors.grey.shade200,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icons[template['icon']] ?? Icons.emoji_events,
+                color: unlocked
+                    ? AppTheme.secondaryColor
+                    : AppTheme.primaryColor,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  template['title'] as String,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text('+${template['points']} pts'),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(template['description'] as String),
+          const SizedBox(height: 12),
+          if (unlocked)
+            const Text(
+              'Completado',
+              style: TextStyle(color: AppTheme.secondaryColor),
+            )
+          else if (observable) ...[
+            LinearProgressIndicator(
+              value: progress,
+              color: AppTheme.primaryColor,
+              backgroundColor: Colors.grey.shade200,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${(progress * 100).round()}% de los requisitos · ${key == 'budget_month'
+                  ? 'mes anterior'
+                  : key == 'streak_7'
+                  ? 'hábito diario'
+                  : 'datos de este mes'}',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ] else
+            Text(
+              key == 'budget_month'
+                  ? 'Se comprueba al cerrar el mes con presupuesto.'
+                  : 'Cargando movimientos…',
+              style: const TextStyle(fontSize: 12),
+            ),
+        ],
+      ),
+    );
   }
 }

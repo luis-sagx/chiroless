@@ -18,6 +18,10 @@ import '../../../transactions/presentation/pages/add_income_page.dart';
 import '../../../transactions/presentation/pages/transactions_page.dart';
 import '../../../analytics/presentation/pages/statistics_page.dart';
 import '../../../achievements/presentation/pages/achievements_page.dart';
+import '../../../achievements/presentation/widgets/gamification_session.dart';
+import '../../../achievements/presentation/widgets/compact_level_indicator.dart';
+import '../../../achievements/data/gamification_service.dart';
+import '../../../achievements/presentation/widgets/reward_feedback.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../profile/presentation/pages/edit_profile_page.dart';
 import '../../../profile/presentation/pages/help_page.dart';
@@ -45,6 +49,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  StreamSubscription<AppUser?>? _userSubscription;
+  bool _hasUserSnapshot = false;
   final service = FirebaseService();
   final userService = UserService();
   final transactionService = TransactionService();
@@ -66,6 +72,25 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    final uid = service.currentUser?.uid;
+    if (uid != null) {
+      _userSubscription = userService
+          .getUserStream(uid)
+          .listen(
+            (user) {
+              if (mounted) {
+                setState(() {
+                  _hasUserSnapshot = true;
+                  appUser = user;
+                  isLoadingUser = false;
+                });
+              }
+            },
+            onError: (Object error) {
+              if (mounted) setState(() => isLoadingUser = false);
+            },
+          );
+    }
     initializeDateFormatting('es', null);
     _loadUser(reconcileRecurring: true);
     ShortcutService.pending.addListener(_handleShortcut);
@@ -78,6 +103,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     ShortcutService.pending.removeListener(_handleShortcut);
+    _userSubscription?.cancel();
     _dataVersion.dispose();
     super.dispose();
   }
@@ -109,7 +135,10 @@ class _HomePageState extends State<HomePage> {
       final userData = await userService.getUser(user.uid);
       if (mounted) {
         setState(() {
-          appUser = userData;
+          // Once live data arrives, a slower fallback read cannot replace it.
+          if (!_hasUserSnapshot) {
+            appUser = userData;
+          }
           isLoadingUser = false;
         });
       }
@@ -293,7 +322,10 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            result.isExpense ? 'Gasto guardado' : 'Ingreso guardado',
+            savedActionFeedback(
+              result.isExpense ? 'Gasto guardado' : 'Ingreso guardado',
+              result.reward,
+            ),
           ),
           backgroundColor: AppTheme.incomeColor,
           duration: const Duration(seconds: 2),
@@ -344,15 +376,20 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: LazyIndexedStack(
-          index: _selectedIndex,
-          builders: [
-            (_) => _buildHomeContent(),
-            (_) => StatisticsPage(refreshListenable: _dataVersion),
-            (_) => const SizedBox.shrink(), // Placeholder for center button
-            (_) => const AchievementsPage(),
-            (_) => _buildProfileContent(),
-          ],
+        child: GamificationSession(
+          points: appUser?.points,
+          onDailyVisit: () =>
+              GamificationService().rewardDailyVisit(service.currentUser!.uid),
+          child: LazyIndexedStack(
+            index: _selectedIndex,
+            builders: [
+              (_) => _buildHomeContent(),
+              (_) => StatisticsPage(refreshListenable: _dataVersion),
+              (_) => const SizedBox.shrink(), // Placeholder for center button
+              (_) => const AchievementsPage(),
+              (_) => _buildProfileContent(),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -453,25 +490,35 @@ class _HomePageState extends State<HomePage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '¡Hola!',
-                          style: TextStyle(color: Colors.white70, fontSize: 16),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          appUser?.name ??
-                              user?.email?.split('@')[0] ??
-                              'Usuario',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '¡Hola!',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            appUser?.name ??
+                                user?.email?.split('@')[0] ??
+                                'Usuario',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (appUser != null)
+                            CompactLevelIndicator(
+                              points: appUser!.points,
+                              onTap: () => setState(() => _selectedIndex = 3),
+                            ),
+                        ],
+                      ),
                     ),
                     InkWell(
                       onTap: () {

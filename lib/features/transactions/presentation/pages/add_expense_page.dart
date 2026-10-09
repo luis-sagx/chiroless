@@ -11,6 +11,7 @@ import '../../data/category_service.dart';
 import '../../data/recurring_transaction_service.dart';
 import '../widgets/recurrence_form_fields.dart';
 import '../../../achievements/data/gamification_service.dart';
+import '../../../achievements/presentation/widgets/reward_feedback.dart';
 import '../../../budget/data/budget_service.dart';
 import '../../../../core/services/notification_service.dart';
 
@@ -140,7 +141,15 @@ class _AddExpensePageState extends State<AddExpensePage> {
           ? await _saveNewExpense(user.uid, expense)
           : await _transactionService.updateExpense(expense);
       if (!saved) throw Exception('No se pudo guardar el gasto');
+      RewardResult? reward;
       if (widget.expense == null) {
+        reward = await confirmReward(
+          _gamificationService.onTransactionRegistered(
+            user.uid,
+            isExpense: true,
+          ),
+        );
+        unawaited(refreshAchievements(_gamificationService, user.uid));
         unawaited(_postSaveTasks(user.uid, expense.amount));
       }
 
@@ -148,7 +157,9 @@ class _AddExpensePageState extends State<AddExpensePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              widget.expense == null ? 'Gasto registrado' : 'Gasto actualizado',
+              widget.expense == null
+                  ? savedActionFeedback('Gasto registrado', reward)
+                  : 'Gasto actualizado',
             ),
             backgroundColor: Colors.green,
           ),
@@ -199,8 +210,6 @@ class _AddExpensePageState extends State<AddExpensePage> {
   }
 
   Future<void> _postSaveTasks(String userId, double amount) async {
-    await _gamificationService.onTransactionRegistered(userId, isExpense: true);
-
     try {
       final budgetStatus = await _budgetService.getBudgetStatus(userId);
       if (budgetStatus['hasBudget'] == true) {
