@@ -619,7 +619,7 @@ class _HomePageState extends State<HomePage> {
                             Text(
                               appUser?.openingBalanceConfigured == true
                                   ? 'Saldo inicial al '
-                                        '${DateFormat('d MMM yyyy', 'es').format(appUser!.openingBalanceDate ?? DateTime.now())}: '
+                                        '${DateFormat('d MMM yyyy', 'es').format(appUser!.openingBalanceDate)}: '
                                         '\$${(appUser?.openingBalanceAmount ?? 0).toStringAsFixed(2)}'
                                   : 'Configura tu saldo inicial para calcularlo',
                               style: const TextStyle(
