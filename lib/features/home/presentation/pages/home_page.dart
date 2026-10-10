@@ -191,13 +191,18 @@ class _HomePageState extends State<HomePage> {
       final openingIncomes = allIncomes.where(
         (income) => !income.date.isBefore(openingDateStart),
       );
+      final incomeSinceOpening = openingIncomes.fold<double>(
+        0,
+        (sum, income) => sum + income.amount,
+      );
+      final expenseSinceOpening = openingExpenses.fold<double>(
+        0,
+        (sum, expense) => sum + expense.amount,
+      );
       final balanceFromOpening =
           (appUser?.openingBalanceAmount ?? 0) +
-          openingIncomes.fold<double>(0, (sum, income) => sum + income.amount) -
-          openingExpenses.fold<double>(
-            0,
-            (sum, expense) => sum + expense.amount,
-          );
+          incomeSinceOpening -
+          expenseSinceOpening;
       final List<dynamic> combined = [...expenses, ...incomes];
       combined.sort((a, b) => b.date.compareTo(a.date));
       final counts = <String, int>{};
@@ -588,7 +593,7 @@ class _HomePageState extends State<HomePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Balance Total',
+                              'Saldo disponible',
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 14,
@@ -610,13 +615,34 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 4),
+                            Text(
+                              appUser?.openingBalanceConfigured == true
+                                  ? 'Saldo inicial al '
+                                        '${DateFormat('d MMM yyyy', 'es').format(appUser!.openingBalanceDate ?? DateTime.now())}: '
+                                        '\$${(appUser?.openingBalanceAmount ?? 0).toStringAsFixed(2)}'
+                                  : 'Configura tu saldo inicial para calcularlo',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
                             const SizedBox(height: 16),
+                            Text(
+                              'Este mes · ${DateFormat('MMMM yyyy', 'es').format(DateTime.now())}',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
                             Row(
                               children: [
                                 Expanded(
                                   child: _buildBalanceItem(
                                     'Ingresos',
-                                    '\$${totalIncome.toStringAsFixed(0)}',
+                                    '+\$${totalIncome.toStringAsFixed(0)}',
                                     Icons.arrow_downward,
                                     AppTheme.incomeColor,
                                   ),
@@ -625,7 +651,7 @@ class _HomePageState extends State<HomePage> {
                                 Expanded(
                                   child: _buildBalanceItem(
                                     'Gastos',
-                                    '\$${totalExpense.toStringAsFixed(0)}',
+                                    '-\$${totalExpense.toStringAsFixed(0)}',
                                     Icons.arrow_upward,
                                     AppTheme.expenseColor,
                                   ),
