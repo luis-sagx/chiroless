@@ -7,9 +7,6 @@ class AppUser {
   final int currentStreak;
   final String? lastTxDate;
   final DateTime createdAt;
-  final double openingBalanceAmount;
-  final DateTime openingBalanceDate;
-  final bool openingBalanceConfigured;
 
   AppUser({
     required this.uid,
@@ -20,10 +17,7 @@ class AppUser {
     this.currentStreak = 0,
     this.lastTxDate,
     required this.createdAt,
-    this.openingBalanceAmount = 0,
-    DateTime? openingBalanceDate,
-    this.openingBalanceConfigured = false,
-  }) : openingBalanceDate = _dateOnly(openingBalanceDate ?? DateTime.now());
+  });
 
   Map<String, dynamic> toMap() {
     return {
@@ -34,12 +28,6 @@ class AppUser {
       'currentStreak': currentStreak,
       'lastTxDate': lastTxDate,
       'createdAt': createdAt,
-      'openingBalanceAmount': openingBalanceAmount,
-      'openingBalanceDate': openingBalanceDate,
-      'openingBalanceConfigured': openingBalanceConfigured,
     };
   }
-
-  static DateTime _dateOnly(DateTime date) =>
-      DateTime(date.year, date.month, date.day);
 }

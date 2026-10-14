@@ -263,7 +263,7 @@ class _SavingsLeaderboardPanelState extends State<SavingsLeaderboardPanel>
               const Padding(
                 padding: EdgeInsets.only(top: 8),
                 child: Text(
-                  'Para aparecer en el ranking necesitas ingresos registrados este mes. Tu saldo inicial no cuenta.',
+                  'Para aparecer en el ranking necesitas ingresos registrados este mes.',
                 ),
               ),
             TextButton(
