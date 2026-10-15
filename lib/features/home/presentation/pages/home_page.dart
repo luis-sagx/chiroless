@@ -25,7 +25,6 @@ import '../../../achievements/data/gamification_service.dart';
 import '../../../achievements/presentation/widgets/reward_feedback.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../profile/presentation/pages/edit_profile_page.dart';
-import '../../../profile/presentation/pages/opening_balance_page.dart';
 import '../../../profile/presentation/pages/help_page.dart';
 import '../../../profile/presentation/pages/terms_conditions_page.dart';
 import '../../../ai_assistant/presentation/pages/ai_assistant_page.dart';
@@ -67,6 +66,7 @@ class _HomePageState extends State<HomePage> {
   double totalExpense = 0.0;
   List<dynamic> recentTransactions = []; // Mix of Expense and Income
   bool isLoadingTransactions = true;
+  bool _transactionLoadFailed = false;
   List<String> _topExpenseCategories = [];
   final ValueNotifier<int> _dataVersion = ValueNotifier<int>(0);
 
@@ -152,13 +152,17 @@ class _HomePageState extends State<HomePage> {
     if (user == null) return;
 
     if (mounted) {
-      setState(() => isLoadingTransactions = true);
+      setState(() {
+        isLoadingTransactions = true;
+        _transactionLoadFailed = false;
+      });
     }
 
     try {
+      await userService.migrateOpeningBalanceToIncome(user.uid);
       final results = await Future.wait([
-        transactionService.getAllUserExpenses(user.uid),
-        transactionService.getAllUserIncomes(user.uid),
+        transactionService.getAllUserExpenses(user.uid, rethrowOnError: true),
+        transactionService.getAllUserIncomes(user.uid, rethrowOnError: true),
       ]);
       final allExpenses = results[0] as List<Expense>;
       final allIncomes = results[1] as List<Income>;
@@ -179,30 +183,9 @@ class _HomePageState extends State<HomePage> {
         0,
         (sum, income) => sum + income.amount,
       );
-      final openingDate = appUser?.openingBalanceDate ?? DateTime.now();
-      final openingDateStart = DateTime(
-        openingDate.year,
-        openingDate.month,
-        openingDate.day,
-      );
-      final openingExpenses = allExpenses.where(
-        (expense) => !expense.date.isBefore(openingDateStart),
-      );
-      final openingIncomes = allIncomes.where(
-        (income) => !income.date.isBefore(openingDateStart),
-      );
-      final incomeSinceOpening = openingIncomes.fold<double>(
-        0,
-        (sum, income) => sum + income.amount,
-      );
-      final expenseSinceOpening = openingExpenses.fold<double>(
-        0,
-        (sum, expense) => sum + expense.amount,
-      );
-      final balanceFromOpening =
-          (appUser?.openingBalanceAmount ?? 0) +
-          incomeSinceOpening -
-          expenseSinceOpening;
+      final historicalBalance =
+          allIncomes.fold<double>(0, (sum, income) => sum + income.amount) -
+          allExpenses.fold<double>(0, (sum, expense) => sum + expense.amount);
       final List<dynamic> combined = [...expenses, ...incomes];
       combined.sort((a, b) => b.date.compareTo(a.date));
       final counts = <String, int>{};
@@ -214,7 +197,7 @@ class _HomePageState extends State<HomePage> {
 
       if (mounted) {
         setState(() {
-          totalBalance = balanceFromOpening;
+          totalBalance = historicalBalance;
           totalIncome = totalIncomes;
           totalExpense = totalExpenses;
           recentTransactions = combined.take(5).toList();
@@ -226,7 +209,10 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Error loading transactions: $e');
       if (mounted) {
-        setState(() => isLoadingTransactions = false);
+        setState(() {
+          isLoadingTransactions = false;
+          _transactionLoadFailed = true;
+        });
       }
     }
   }
@@ -309,16 +295,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _navigateToOpeningBalance() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const OpeningBalancePage()),
-    );
-    if (result == true) {
-      _loadUser(); // Reload to update the balance
-    }
-  }
-
   void _showAddTransactionOptions({bool isExpense = true}) async {
     final result = await showModalBottomSheet<QuickAddResult>(
       context: context,
@@ -354,23 +330,15 @@ class _HomePageState extends State<HomePage> {
     final now = DateTime.now();
     final isCurrentMonth =
         result.date.year == now.year && result.date.month == now.month;
-    final openingDate = appUser?.openingBalanceDate ?? DateTime.now();
-    final openingDateStart = DateTime(
-      openingDate.year,
-      openingDate.month,
-      openingDate.day,
-    );
-    final affectsBalance = !result.date.isBefore(openingDateStart);
-    if (!isCurrentMonth && !affectsBalance) return;
     setState(() {
       if (isCurrentMonth && result.isExpense) {
         totalExpense += result.amount;
       } else if (isCurrentMonth) {
         totalIncome += result.amount;
       }
-      if (affectsBalance && result.isExpense) {
+      if (result.isExpense) {
         totalBalance -= result.amount;
-      } else if (affectsBalance) {
+      } else {
         totalBalance += result.amount;
       }
     });
@@ -589,6 +557,22 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         )
+                      : _transactionLoadFailed
+                      ? Column(
+                          children: [
+                            const Text(
+                              'No pudimos calcular tu saldo. Vuelve a intentarlo.',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            TextButton(
+                              onPressed: _loadTransactionData,
+                              child: const Text(
+                                'Reintentar',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        )
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -613,18 +597,6 @@ class _HomePageState extends State<HomePage> {
                                   fontSize: 36,
                                   fontWeight: FontWeight.bold,
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              appUser?.openingBalanceConfigured == true
-                                  ? 'Saldo inicial al '
-                                        '${DateFormat('d MMM yyyy', 'es').format(appUser!.openingBalanceDate)}: '
-                                        '\$${(appUser?.openingBalanceAmount ?? 0).toStringAsFixed(2)}'
-                                  : 'Configura tu saldo inicial para calcularlo',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -658,32 +630,6 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               ],
                             ),
-                            if (appUser != null &&
-                                !appUser!.openingBalanceConfigured) ...[
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Configura el dinero que tenías al comenzar '
-                                'para calcular tu saldo disponible.',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              OutlinedButton.icon(
-                                onPressed: _navigateToEditProfile,
-                                icon: const Icon(
-                                  Icons.account_balance_wallet_outlined,
-                                ),
-                                label: const Text('Configurar saldo inicial'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  side: BorderSide(
-                                    color: Colors.white.withValues(alpha: 0.6),
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                 ),
@@ -904,11 +850,6 @@ class _HomePageState extends State<HomePage> {
                 Icons.person_outline,
                 'Editar perfil',
                 _navigateToEditProfile,
-              ),
-              _buildMenuItem(
-                Icons.account_balance_wallet_outlined,
-                'Saldo inicial',
-                _navigateToOpeningBalance,
               ),
               _buildMenuItem(
                 Icons.category_outlined,
