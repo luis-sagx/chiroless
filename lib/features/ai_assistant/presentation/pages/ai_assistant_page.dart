@@ -39,7 +39,7 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
     setState(() {
       _messages.add({
         'text':
-            '¡Hola! 👋 Soy SAY, tu asistente financiero inteligente. '
+            '¡Hola! 👋 Soy ChiroBot, tu asistente financiero inteligente. '
             'Puedo ayudarte con:\n\n'
             '• Análisis de tu situación financiera\n'
             '• Consejos personalizados de ahorro\n'
@@ -173,7 +173,7 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Asistente IA SAY'),
+        title: const Text('ChiroBot'),
         actions: [
           IconButton(
             icon: const Icon(Icons.lightbulb_outline),
